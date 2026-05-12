@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="500px" height="500px" viewBox="0 0 500 500" enable-background="new 0 0 500 500" xml:space="preserve">
+<path fill-rule="evenodd" clip-rule="evenodd" fill="#EEEEEE" d="M181.924,187.797c7.056,11.438,16.325,20.017,28.04,26.104
+	c11.715,6.088,32.469,12.452,42.982,20.984c10.47,8.532,30.025,25.873,34.406,30.993c4.382,5.118,2.676,8.532,18.033,8.532
+	c15.402,0,42.015-19.739,51.283-24.904c9.271-5.12,15.589-5.859,15.589-5.859s-12.177-43.167-37.079-69.04
+	c-24.906-25.873-54.929-43.444-64.659-45.888c-9.777-2.445-23.706-6.826-46.858-0.23
+	C198.942,135.499,169.424,167.551,181.924,187.797L181.924,187.797z"/>
+<path fill-rule="evenodd" clip-rule="evenodd" fill="#BBBDBF" d="M185.014,100.54c21.214,15.174,28.086,42.661,15.358,61.292
+	c-12.73,18.678-40.217,21.491-61.385,6.272c-21.168-15.219-28.042-42.661-15.312-61.339
+	C136.357,88.088,163.845,85.32,185.014,100.54L185.014,100.54z"/>
+<path fill-rule="evenodd" clip-rule="evenodd" fill="#97999B" d="M189.395,246.83c0,0-25.366,26.104-38.278,26.334
+	c-12.96,0.23-13.928-3.644-21.493-17.341c-7.563-13.652-27.117-59.771-29.514-67.703c-2.445-7.933,1.198-20.708,13.88-21.354
+	C126.673,166.121,189.395,246.83,189.395,246.83L189.395,246.83z"/>
+<path fill-rule="evenodd" clip-rule="evenodd" fill="#97999B" d="M286.291,274.732c0,0-35.695,97.035-38.602,120.463
+	c-2.951,23.43-0.738,45.658,9.04,48.839c9.731,3.184,33.668,1.708,39.755-1.983c6.089-3.642,11.254-144.95,11.254-144.95
+	l-15.496-18.171C292.241,278.93,288.782,277.178,286.291,274.732L286.291,274.732z"/>
+<path fill-rule="evenodd" clip-rule="evenodd" fill="#BBBDBF" d="M374.473,247.337c0,0,14.02,15.496,11.344,35.974
+	c-2.674,20.523-19.876,54.328-24.996,71.624c-5.118,17.34-16.143,51.515-16.143,51.515s66.412-3.412,78.588-3.644
+	c12.222-0.278,23.936,0.692,25.643,13.649c1.707,12.915-4.383,19.279-10.515,20.986c-6.089,1.707-115.437,24.167-130.563,21.721
+	c-15.128-2.444-24.397-7.793-26.104-17.34c-1.706-9.501,17.802-109.071,19.277-122.77c1.476-13.652-8.763-40.123-8.763-40.123
+	s18.54,2.443,30.253-2.952C334.209,270.628,360.081,250.473,374.473,247.337L374.473,247.337z"/>
+<path fill-rule="evenodd" clip-rule="evenodd" fill="#BBBDBF" d="M269.734,193.102c0,0-36.755,72.361-51.331,74.897
+	c-20.477,3.597-90.67-64.844-96.573-77.25c-2.306-4.889-4.104-17.803,3.735-23.798c7.887-6.041,14.297-6.133,24.306,3.552
+	l23.058,22.367l35.236,27.073c0,0,9.364-25.227,15.313-36.573c5.903-11.345,4.289-37.818,30.669-34.589
+	S279.928,171.333,269.734,193.102L269.734,193.102z"/>
+<linearGradient id="SVGID_1_" gradientUnits="userSpaceOnUse" x1="96.9697" y1="187.5605" x2="115.9976" y2="187.5605">
+	<stop  offset="0.06" style="stop-color:#0D0D0D"/>
+	<stop  offset="0.09" style="stop-color:#999999"/>
+	<stop  offset="0.11" style="stop-color:#C8C8C8"/>
+	<stop  offset="0.15" style="stop-color:#9D9D9D"/>
+	<stop  offset="0.19" style="stop-color:#777777"/>
+	<stop  offset="0.24" style="stop-color:#575757"/>
+	<stop  offset="0.3" style="stop-color:#3B3B3B"/>
+	<stop  offset="0.36" style="stop-color:#252525"/>
+	<stop  offset="0.43" style="stop-color:#141414"/>
+	<stop  offset="0.52" style="stop-color:#090909"/>
+	<stop  offset="0.65" style="stop-color:#020202"/>
+	<stop  offset="1" style="stop-color:#000000"/>
+</linearGradient>
+<path fill-rule="evenodd" clip-rule="evenodd" fill="url(#SVGID_1_)" d="M110.624,178.251c0,0,5.027,1.245,5.349,6.871
+	c0.37,5.581-3.413,11.945-8.994,12.545c-5.626,0.6-10.146-5.119-10.006-8.532C97.065,185.722,103.567,174.239,110.624,178.251
+	L110.624,178.251z"/>
+<linearGradient id="SVGID_2_" gradientUnits="userSpaceOnUse" x1="113.4858" y1="83.1602" x2="81.2739" y2="88.4038">
+	<stop  offset="0.06" style="stop-color:#0D0D0D"/>
+	<stop  offset="0.09" style="stop-color:#999999"/>
+	<stop  offset="0.11" style="stop-color:#C8C8C8"/>
+	<stop  offset="0.15" style="stop-color:#9D9D9D"/>
+	<stop  offset="0.19" style="stop-color:#777777"/>
+	<stop  offset="0.24" style="stop-color:#575757"/>
+	<stop  offset="0.3" style="stop-color:#3B3B3B"/>
+	<stop  offset="0.36" style="stop-color:#252525"/>
+	<stop  offset="0.43" style="stop-color:#141414"/>
+	<stop  offset="0.52" style="stop-color:#090909"/>
+	<stop  offset="0.65" style="stop-color:#020202"/>
+	<stop  offset="1" style="stop-color:#000000"/>
+</linearGradient>
+<path fill-rule="evenodd" clip-rule="evenodd" fill="url(#SVGID_2_)" d="M135.251,162.754c0,0-24.399-107.134-25.596-114.421
+	c-1.246-7.333-7.334-47.596-7.334-47.596L94.297,0l9.961,170.78c2.167-2.122,5.166-3.644,9.039-3.967l-2.537-64.059l14.067,64.843
+	C124.828,167.598,130.132,162.663,135.251,162.754L135.251,162.754z"/>
+</svg>
