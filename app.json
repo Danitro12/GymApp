@@ -25,7 +25,10 @@
       "package": "com.pepeda.gymapp"
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/image.png",
+      "display": "standalone"
     },
     "sdkVersion": "54.0.0",
     "extra": {
