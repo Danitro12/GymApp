@@ -11,7 +11,7 @@ const LANGUAGES = [
   { code: 'en', flag: 'US', name: 'English',  native: 'English'  },
   { code: 'es', flag: 'ES', name: 'Español',  native: 'Spanish'  },
 ];
-const DEBUG = true;
+const DEBUG = __DEV__;
 export default function SettingsScreen() {
   const { language, setLanguage, t } = useLanguage();
   const [shouldClear, setShouldClear] = useState(false);
@@ -83,11 +83,11 @@ export default function SettingsScreen() {
           
         </View>
 
-        <View style={{ height: 15 }} />
-
-        <View style={styles.card}>
-          {DEBUG && (
-            <TouchableOpacity
+        {DEBUG && (
+          <>
+            <View style={{ height: 15 }} />
+            <View style={styles.card}>
+              <TouchableOpacity
                 key={123}
                 style={[styles.langRow]}
                 activeOpacity={0.75}
@@ -99,8 +99,9 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               </TouchableOpacity>
-          )}
-        </View>
+            </View>
+          </>
+        )}
         <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>

@@ -59,9 +59,9 @@ export default function ExerciseSetRow({ set, previous, targetReps, reps, weight
       />
 
       {/* Check indicator */}
-      <View style={[styles.checkBtn, checked && styles.checkBtnActive]}>
+      <TouchableOpacity style={[styles.checkBtn, checked && styles.checkBtnActive]} onPress={onCheck} activeOpacity={0.7}>
         <Text style={[styles.checkIcon, checked && styles.checkIconActive]}>✓</Text>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -98,6 +98,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1.2,
+    minWidth: 48,
     backgroundColor: COLORS.inputBg,
     borderRadius: 8,
     color: COLORS.white,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, findNodeHandle,Animated
+  TouchableOpacity, Alert, findNodeHandle, Animated, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../data/theme';
@@ -54,7 +54,22 @@ export default function ActiveWorkoutScreen({ route, navigation }) {
   const updateSet = (exIndex, setIndex, field, value) => {
     setExerciseSets((prev) => {
       const next = [...prev];
-      next[exIndex] = { ...next[exIndex], sets: next[exIndex].sets.map((s, i) => i === setIndex ? { ...s, [field]: value } : s) };
+      next[exIndex] = {
+        ...next[exIndex],
+        sets: next[exIndex].sets.map((s, i) => {
+          if (i === setIndex) {
+            const updated = { ...s, [field]: value };
+            // Auto-check if both fields are filled (not empty strings)
+            if (updated.reps !== '' && updated.weight !== '') {
+              updated.checked = true;
+            } else {
+              updated.checked = false;
+            }
+            return updated;
+          }
+          return s;
+        })
+      };
       return next;
     });
   };
@@ -71,6 +86,7 @@ export default function ActiveWorkoutScreen({ route, navigation }) {
   };
 
   const handleInputFocus = (inputRef) => {
+    if (Platform.OS === 'web') return;
     const node = inputRef?.current ? findNodeHandle(inputRef.current) : null;
     const responder = scrollRef.current?.getScrollResponder?.();
     if (node && responder?.scrollResponderScrollNativeHandleToKeyboard) {
@@ -89,32 +105,38 @@ export default function ActiveWorkoutScreen({ route, navigation }) {
   };
 
   const handleFinish = () => {
-    Alert.alert(
-      t.finishWorkoutQ,
-      `${t.finishWorkoutMsg} ${completedCount}/${routine.exercises.length} ${t.finishExercisesIn} ${formatTime(elapsed)}.`,
-      [
-        { text: t.keepGoing, style: 'cancel' },
-        {
-          text: t.finish,
-          onPress: async () => {
-            clearInterval(timerRef.current);
-            const today = new Date().toISOString().split('T')[0];
-            await saveWorkoutToHistory({
-              id:                 `h_${Date.now()}`,
-              routineId:          routine.id,
-              routineName:        routine.name,
-              date:               today,
-              duration:           Math.round(elapsed / 60),
-              exercisesCompleted: completedCount,
-              totalExercises:     routine.exercises.length,
-              sets:               exerciseSets,
-            });
-            await updateRoutineRecords(routine.id, exerciseSets);
-            navigation.goBack();
-          },
-        },
-      ]
-    );
+    const msg = `${t.finishWorkoutMsg} ${completedCount}/${routine.exercises.length} ${t.finishExercisesIn} ${formatTime(elapsed)}.`;
+    const onFinish = async () => {
+      clearInterval(timerRef.current);
+      const today = new Date().toISOString().split('T')[0];
+      await saveWorkoutToHistory({
+        id:                 `h_${Date.now()}`,
+        routineId:          routine.id,
+        routineName:        routine.name,
+        date:               today,
+        duration:           Math.round(elapsed / 60),
+        exercisesCompleted: completedCount,
+        totalExercises:     routine.exercises.length,
+        sets:               exerciseSets,
+      });
+      await updateRoutineRecords(routine.id, exerciseSets);
+      navigation.goBack();
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${t.finishWorkoutQ}\n\n${msg}`)) {
+        onFinish();
+      }
+    } else {
+      Alert.alert(
+        t.finishWorkoutQ,
+        msg,
+        [
+          { text: t.keepGoing, style: 'cancel' },
+          { text: t.finish, onPress: onFinish },
+        ]
+      );
+    }
   };
 
   const toggleTimer = () => setIsTimerRunning((prev) => !prev);
@@ -129,10 +151,16 @@ export default function ActiveWorkoutScreen({ route, navigation }) {
     <SafeAreaView style={styles.safe}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => {
-          Alert.alert(t.cancelWorkout, t.cancelWorkoutMsg, [
-            { text: t.keepGoing, style: 'cancel' },
-            { text: t.cancel, style: 'destructive', onPress: () => navigation.goBack() },
-          ]);
+          if (Platform.OS === 'web') {
+            if (window.confirm(`${t.cancelWorkout}\n\n${t.cancelWorkoutMsg}`)) {
+              navigation.goBack();
+            }
+          } else {
+            Alert.alert(t.cancelWorkout, t.cancelWorkoutMsg, [
+              { text: t.keepGoing, style: 'cancel' },
+              { text: t.cancel, style: 'destructive', onPress: () => navigation.goBack() },
+            ]);
+          }
         }} style={styles.backBtn}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
@@ -172,8 +200,9 @@ export default function ActiveWorkoutScreen({ route, navigation }) {
             </View>
             <Text style={styles.exCat}>{exercise?.category}</Text>
             <View style={styles.colHeaders}>
-              <Text style={[styles.colLabel, { width: 37 }]}>{t.set}</Text>
+              <Text style={[styles.colLabel, { width: 32, textAlign: 'center' }]}>{t.set}</Text>
               <Text style={[styles.colLabel, { flex: 1, textAlign: 'center' }]}>{t.record}</Text>
+              <Text style={[styles.colLabel, { width: 28, textAlign: 'center' }]}></Text>
               <Text style={[styles.colLabel, { flex: 1.2, textAlign: 'center' }]}>{t.reps}</Text>
               <Text style={[styles.colLabel, { flex: 1.2, textAlign: 'center' }]}>{t.weight}</Text>
               <View style={{ width: 36 }} />
