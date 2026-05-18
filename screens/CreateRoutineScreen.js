@@ -504,7 +504,7 @@
     createBtnDisabled: { backgroundColor: '#6b3010' },
     createBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-    sheet: { backgroundColor: '#1e1e1e', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '82%', paddingTop: 8 },
+    sheet: { backgroundColor: '#1e1e1e', borderTopLeftRadius: 24, borderTopRightRadius: 24, flex: 1, marginTop: '18%', paddingTop: 8 },
     sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
     sheetHeader2: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.orange },
     sheetTitle: { color: COLORS.white, fontSize: 18, fontWeight: '700' },

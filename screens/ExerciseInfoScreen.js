@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Path } from 'react-native-svg';
@@ -14,7 +14,6 @@ import BodyFrontSvg from '../assets/cuerpo-frontal.svg';
 import BodyBackSvg from '../assets/cuerpo-back.svg';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-const { width: SW } = Dimensions.get('window');
 
 const muscleColor = (intensity) => {
   if (!intensity || intensity < 0.05) return '#2e2e2e';
@@ -64,6 +63,7 @@ const applyMuscleColors = (node, colorMap, activeGroup) => {
 };
 
 export default function ExerciseInfoScreen({ navigation, route }) {
+  const { width: SW } = useWindowDimensions();
   const { t, language } = useLanguage();
   const [viewMode, setViewMode] = useState('front');
   const pagerRef = useRef(null);
@@ -209,7 +209,7 @@ export default function ExerciseInfoScreen({ navigation, route }) {
         contentContainerStyle={styles.pagerContent}
       >
         <ScrollView
-          style={styles.page}
+          style={[styles.page, { width: SW }]}
           contentContainerStyle={styles.pageContent}
           showsVerticalScrollIndicator={false}
         >
@@ -232,7 +232,7 @@ export default function ExerciseInfoScreen({ navigation, route }) {
         </ScrollView>
 
         <ScrollView
-          style={styles.page}
+          style={[styles.page, { width: SW }]}
           contentContainerStyle={styles.pageContent}
           showsVerticalScrollIndicator={false}
         >
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   headerTitle: { color: COLORS.white, fontSize: 18, fontWeight: '700', flex: 1 },
   scroll: { flex: 1 },
   pagerContent: { flexDirection: 'row' },
-  page: { width: SW },
+  page: {},
   pageContent: { padding: 20, paddingTop: 8 },
   iconWrap: { width: 220, height: 220, borderRadius: 110, backgroundColor: COLORS.card, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: 16, overflow: 'hidden' },
   descCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, marginBottom: 20 },

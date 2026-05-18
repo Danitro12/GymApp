@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Dimensions,
+  TouchableOpacity, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { G, Path } from 'react-native-svg';
@@ -14,8 +14,6 @@ import FrontSvg from '../assets/frontal.svg';
 import BackSvg from '../assets/back.svg';
 import BodyFrontSvg from '../assets/cuerpo-frontal.svg';
 import BodyBackSvg from '../assets/cuerpo-back.svg';
-
-const { width: SW } = Dimensions.get('window');
 
 // ─── Calcula carga muscular normalizada ───────────────────────────────────────
 const computeLoad = (routine) => {
@@ -122,6 +120,7 @@ const bar = StyleSheet.create({
 
 // ─── PANTALLA PRINCIPAL ───────────────────────────────────────────────────────
 export default function MusclesScreen() {
+  const { width: SW } = useWindowDimensions();
   const { t } = useLanguage();
   const [routines,          setRoutines]          = useState([]);
   const [selectedRoutineId, setSelectedRoutineId] = useState(null);

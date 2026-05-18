@@ -28,7 +28,12 @@
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/image.png",
-      "display": "standalone"
+      "display": "standalone",
+      "themeColor": "#1a1a1a",
+      "backgroundColor": "#1a1a1a",
+      "lang": "es",
+      "shortName": "GymApp",
+      "name": "GymApp"
     },
     "sdkVersion": "54.0.0",
     "extra": {
