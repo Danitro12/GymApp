@@ -57,7 +57,7 @@ export default function RoutinesScreen({ navigation }) {
 
   
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} scrollEnabled={outerScrollEnabled} nestedScrollEnabled>
           <View style={styles.header}>
             <View>

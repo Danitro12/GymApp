@@ -148,7 +148,7 @@ export default function ActiveWorkoutScreen({ route, navigation }) {
 
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => {
           if (Platform.OS === 'web') {

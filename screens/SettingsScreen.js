@@ -8,8 +8,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { clearAllData } from '../data/storage';
 
 const LANGUAGES = [
-  { code: 'en', flag: 'US', name: 'English',  native: 'English'  },
-  { code: 'es', flag: 'ES', name: 'Español',  native: 'Spanish'  },
+  { code: 'en', flag: 'US', name: 'English', native: 'English' },
+  { code: 'es', flag: 'ES', name: 'Español', native: 'Spanish' },
 ];
 const DEBUG = __DEV__;
 export default function SettingsScreen() {
@@ -24,7 +24,7 @@ export default function SettingsScreen() {
     }
   }, [shouldClear]);
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
@@ -80,7 +80,7 @@ export default function SettingsScreen() {
           })}
 
 
-          
+
         </View>
 
         {DEBUG && (
@@ -109,12 +109,12 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: COLORS.background },
-  scroll:  { flex: 1 },
+  safe: { flex: 1, backgroundColor: COLORS.background },
+  scroll: { flex: 1 },
   content: { padding: 20, paddingTop: 24 },
 
   title: { color: COLORS.white, fontSize: 28, fontWeight: '800', marginBottom: 4 },
-  sub:   { color: COLORS.textSecondary, fontSize: 14, marginBottom: 28 },
+  sub: { color: COLORS.textSecondary, fontSize: 14, marginBottom: 28 },
 
   card: {
     backgroundColor: COLORS.card,
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   },
   iconEmoji: { fontSize: 20 },
   cardTitle: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
-  cardSub:   { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
+  cardSub: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
 
   divider: { height: 1, backgroundColor: COLORS.border, marginBottom: 12 },
 

@@ -239,7 +239,7 @@ export default function MusclesScreen() {
   const displayMuscles = viewMode === 'front' ? frontMuscles : backMuscles;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>{t.muscleMap}</Text>
         <Text style={styles.sub}>{t.visualizeIntensity}</Text>

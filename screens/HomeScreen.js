@@ -27,7 +27,7 @@ export default function HomeScreen({ navigation }) {
         const h = await loadHistory();
         setRoutines(r);
         setHistory(h);
-        const todayIdx = (new Date().getDay() + 6) % 7; 
+        const todayIdx = (new Date().getDay() + 6) % 7;
         setTodayRoutine(r.filter((routine) => routine.days?.includes(todayIdx)));
 
       })();
@@ -97,7 +97,7 @@ export default function HomeScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRowCentered}>
           <View style={{ width: 38 }} /> {/* Balancer */}
@@ -188,50 +188,50 @@ export default function HomeScreen({ navigation }) {
 
         {todayRoutine.length > 0 ? (
           <View style={styles.workoutCard}>
-          {todayRoutine.map((routine) => (
-            <View key={routine.id}>
-              
-              <Text style={styles.workoutName}>{routine.name}</Text>
-              <Text style={styles.workoutSub}>
-                {routine.exercises.length}{' '}
-                {routine.exercises.length === 1 ? t.exercise : t.exercises}
-              </Text>
+            {todayRoutine.map((routine) => (
+              <View key={routine.id}>
 
-              <View style={styles.exList}>
-                {routine.exercises.slice(0, 3).map((ex, i) => {
-                  const exercise = getExerciseById(ex.exerciseId);
-                  return (
-                    <View key={i} style={styles.exRow}>
-                      <Text style={styles.exName}>
-                        {getExerciseName(exercise, language) || ex.exerciseId}
-                      </Text>
-                      <Text style={styles.exDetail}>
-                        {ex.sets.length} × {ex.sets[0]?.reps}
-                        {ex.sets[0]?.weight > 0
-                          ? ` @ ${ex.sets[0].weight}lbs`
-                          : ''}
-                      </Text>
-                    </View>
-                  );
-                })}
+                <Text style={styles.workoutName}>{routine.name}</Text>
+                <Text style={styles.workoutSub}>
+                  {routine.exercises.length}{' '}
+                  {routine.exercises.length === 1 ? t.exercise : t.exercises}
+                </Text>
 
-                {routine.exercises.length > 3 && (
-                  <Text style={styles.moreEx}>
-                    +{routine.exercises.length - 3} {t.moreExercises}
-                  </Text>
-                )}
+                <View style={styles.exList}>
+                  {routine.exercises.slice(0, 3).map((ex, i) => {
+                    const exercise = getExerciseById(ex.exerciseId);
+                    return (
+                      <View key={i} style={styles.exRow}>
+                        <Text style={styles.exName}>
+                          {getExerciseName(exercise, language) || ex.exerciseId}
+                        </Text>
+                        <Text style={styles.exDetail}>
+                          {ex.sets.length} × {ex.sets[0]?.reps}
+                          {ex.sets[0]?.weight > 0
+                            ? ` @ ${ex.sets[0].weight}lbs`
+                            : ''}
+                        </Text>
+                      </View>
+                    );
+                  })}
+
+                  {routine.exercises.length > 3 && (
+                    <Text style={styles.moreEx}>
+                      +{routine.exercises.length - 3} {t.moreExercises}
+                    </Text>
+                  )}
+                </View>
+
+                <OrangeButton
+                  icon="▶"
+                  onPress={() =>
+                    navigation.navigate('ActiveWorkout', { routine })
+                  }
+                  style={styles.startBtn}
+                />
+
               </View>
-
-              <OrangeButton
-                icon="▶"
-                onPress={() =>
-                  navigation.navigate('ActiveWorkout', { routine })
-                }
-                style={styles.startBtn}
-              />
-
-            </View>
-          ))}
+            ))}
           </View>
         ) : (
           <View style={styles.emptyCard}>
