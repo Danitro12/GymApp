@@ -7,12 +7,15 @@ import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../data/theme';
 import { loadHistory, loadRoutines } from '../data/storage';
 import { useLanguage } from '../context/LanguageContext';
-import { EXERCISE_CATALOG, getExerciseName } from '../data/exercises';
+import { resolveExerciseName } from '../data/exercises';
+import ScreenHeader from '../components/ScreenHeader';
+import { toDateKey, fromDateKey, weekdayIndex, localeFor, historyMinutes } from '../utils/date';
 export default function HistoryScreen({ navigation, route }) {
   const { t, language } = useLanguage();
   const today = new Date();
   const [viewDate, setViewDate] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const [selectedDate, setSelectedDate] = useState(today.toISOString().split('T')[0]);
+  const todayKey = toDateKey(today);
+  const [selectedDate, setSelectedDate] = useState(route?.params?.selectedDate || todayKey);
   const [history, setHistory] = useState([]);
   const [routines, setRoutines] = useState([]);
   const [newdayroutines, setDayRoutines] = useState([[],[],[],[],[],[],[]]);
@@ -27,7 +30,7 @@ export default function HistoryScreen({ navigation, route }) {
     setHistory(historyData);
     setRoutines(routinesData);
     const dayroutines = [[],[],[],[],[],[],[]];
-    routinesData.forEach((r) => {r.days.forEach((d) => {dayroutines[d].push(r);})});
+    routinesData.forEach((r) => { (r.days || []).forEach((d) => { dayroutines[d]?.push(r); }); });
     setDayRoutines(dayroutines);
     };
     initializeDayRoutines();
@@ -59,29 +62,20 @@ export default function HistoryScreen({ navigation, route }) {
     year === today.getFullYear() && month === today.getMonth() && day === today.getDate();
 
   const selectedWorkouts = history.filter((h) => h.date === selectedDate);
-  const routinesToday = newdayroutines[((new Date(selectedDate + 'T00:00:00')).getDay()+ 6) % 7];
-  const pendingRoutines = routinesToday.filter(
-    (routine) => !selectedWorkouts.some((workout) => workout.routineId === routine.id)
-  );
+  const routinesToday = newdayroutines[weekdayIndex(fromDateKey(selectedDate))] || [];
+  // Solo son "pendientes" las rutinas de hoy o de días futuros.
+  const pendingRoutines = selectedDate >= todayKey
+    ? routinesToday.filter((routine) => !selectedWorkouts.some((workout) => workout.routineId === routine.id))
+    : [];
 
   const formatSelectedDate = () => {
-    const d = new Date(selectedDate + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  };
-
-  const dayfromRoutine = (day) => {
-    const r = routines.map((r) => r.days.find((d) => d === day));
+    return fromDateKey(selectedDate).toLocaleDateString(localeFor(language), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   };
 
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backEmoji}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>{t.workoutHistory}</Text>
-      </View>
+      <ScreenHeader onBack={() => navigation.goBack()} title={t.workoutHistory} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Calendario */}
@@ -110,7 +104,6 @@ export default function HistoryScreen({ navigation, route }) {
               const todayFlag = isToday(day);
               const worked = workoutDates.has(dateStr);
               const routinesToday = newdayroutines[dayOfWeek] || [];
-              const todayDate = today.toISOString().split('T')[0];
               return (
                 <TouchableOpacity
                   key={day}
@@ -122,7 +115,7 @@ export default function HistoryScreen({ navigation, route }) {
                     {day}
                   </Text>
                   {worked && <View style={[styles.dot, selected && styles.dotSelected]} />}
-                  {routinesToday.length > 0 && dateStr >= todayDate && <View style={[styles.dot, { backgroundColor: COLORS.orange, right: 12 }, selected && { backgroundColor: COLORS.white }]} />}
+                  {routinesToday.length > 0 && dateStr >= todayKey && <View style={[styles.dot, { backgroundColor: COLORS.orange, right: 12 }, selected && { backgroundColor: COLORS.white }]} />}
                 </TouchableOpacity>
               );
             })}
@@ -156,8 +149,7 @@ export default function HistoryScreen({ navigation, route }) {
                 {routineweights === routine.id && Array.isArray(routine.exercises) ? (
                   <View style={{ marginTop: 12 }}>
                     {routine.exercises.map((ex, i) => {
-                      const exercise = EXERCISE_CATALOG.find((e) => e.id === ex.exerciseId);
-                      const name = exercise ? getExerciseName(exercise, language) : ex.exerciseId;
+                      const name = resolveExerciseName(ex.exerciseId, language);
                       const repsText = ex.sets.map((s) => (Number(s.reps) > 0 ? s.reps : '-')).join('  •  ');
                       return (
                         <View key={`${ex.exerciseId}-${i}`} style={styles.setRow}>
@@ -187,7 +179,7 @@ export default function HistoryScreen({ navigation, route }) {
                   <View style={styles.histHeader}>
                     <Text style={styles.histName}>{routineName}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={styles.histDuration}>{workout.duration} {t.min}</Text>
+                      <Text style={styles.histDuration}>{historyMinutes(workout)} {t.min}</Text>
                       <Text style={{ fontSize: 16, color: COLORS.green }}>✓</Text>
                     </View>
                   </View>
@@ -198,8 +190,7 @@ export default function HistoryScreen({ navigation, route }) {
                   {routineweights === workout.id && Array.isArray(workout.sets) ? (
                     <View style={{ marginTop: 12 }}>
                       {workout.sets.map((ex, i) => {
-                        const exercise = EXERCISE_CATALOG.find((e) => e.id === ex.exerciseId);
-                        const name = exercise ? getExerciseName(exercise, language) : ex.exerciseId;
+                        const name = resolveExerciseName(ex.exerciseId, language, ex.exerciseName);
                         const hasCompletedSet = ex.sets.some(
                           (s) => Number(s.reps) > 0 || Number(s.weight) > 0
                         );
@@ -208,7 +199,10 @@ export default function HistoryScreen({ navigation, route }) {
                           <View key={i} style={styles.setRow}>
                             <Text style={styles.setExerciseName}>{name}</Text>
                             <Text style={styles.setValues}>
-                              {ex.sets.map((s) => `${s.reps}x${s.weight}`).join('  •  ')}
+                              {ex.sets
+                                .filter((s) => Number(s.reps) > 0 || Number(s.weight) > 0)
+                                .map((s) => `${s.reps || 0} × ${s.weight || 0} kg`)
+                                .join('  •  ')}
                             </Text>
                           </View>
                         );
@@ -249,10 +243,11 @@ const styles = StyleSheet.create({
   navBtn: { padding: 8 },
   navArrow: { color: COLORS.textSecondary, fontSize: 22 },
   monthLabel: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
-  dayLabels: { flexDirection: 'row',gap:6 , marginBottom: 8 },
-  dayLabel: { width: CELL, textAlign: 'center', color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap:6 },
-  cell: { width: CELL, height: CELL, alignItems: 'center', justifyContent: 'center', borderRadius: 10, marginVertical: 2 },
+  // Anchos en % para que las 7 columnas quepan en cualquier pantalla.
+  dayLabels: { flexDirection: 'row', marginBottom: 8 },
+  dayLabel: { width: `${100 / 7}%`, textAlign: 'center', color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  cell: { width: `${100 / 7}%`, height: CELL, alignItems: 'center', justifyContent: 'center', borderRadius: 10, marginVertical: 2 },
   cellSelected: { backgroundColor: COLORS.orange },
   cellToday: { backgroundColor: COLORS.border },
   cellText: { color: COLORS.white, fontSize: 14, fontWeight: '500' },

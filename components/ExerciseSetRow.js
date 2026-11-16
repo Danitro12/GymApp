@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { COLORS } from '../data/theme';
 
-export default function ExerciseSetRow({ set, previous, targetReps, reps, weight, onRepsChange, onWeightChange, onCheck, onWeightSubmit, checked, onInputFocus }) {
+function ExerciseSetRow({ set, previous, targetReps, reps, weight, onRepsChange, onWeightChange, onCheck, onWeightSubmit, checked, onInputFocus }) {
   const repsRef = useRef(null);
   const weightRef = useRef(null);
   const targetText = targetReps === null || targetReps === undefined || targetReps === ''
@@ -18,8 +18,10 @@ export default function ExerciseSetRow({ set, previous, targetReps, reps, weight
   return (
     <View style={[styles.row, checked && styles.rowChecked]}>
       {/* Set number */}
-      <View style={styles.setBox}>
-        <Text style={styles.setNum}>{set}</Text>
+      <View style={styles.setCol}>
+        <View style={styles.setBox}>
+          <Text style={styles.setNum}>{set}</Text>
+        </View>
       </View>
 
       {/* Previous */}
@@ -35,9 +37,10 @@ export default function ExerciseSetRow({ set, previous, targetReps, reps, weight
         value={String(reps)}
         onChangeText={onRepsChange}
         keyboardType="decimal-pad"
+        inputMode="decimal"
         selectTextOnFocus
-        placeholder="-"
-        placeholderTextColor={COLORS.textSecondary}
+        placeholder={targetText !== '-' ? targetText : '-'}
+        placeholderTextColor={COLORS.textMuted}
         returnKeyType="next"
         onSubmitEditing={() => weightRef.current?.focus()}
         onFocus={() => onInputFocus?.(repsRef)}
@@ -51,9 +54,10 @@ export default function ExerciseSetRow({ set, previous, targetReps, reps, weight
         onChangeText={onWeightChange}
         onSubmitEditing={onWeightSubmit}
         keyboardType="decimal-pad"
+        inputMode="decimal"
         selectTextOnFocus
-        placeholder="-"
-        placeholderTextColor={COLORS.textSecondary}
+        placeholder="kg"
+        placeholderTextColor={COLORS.textMuted}
         returnKeyType="done"
         onFocus={() => onInputFocus?.(weightRef)}
       />
@@ -77,6 +81,7 @@ const styles = StyleSheet.create({
   rowChecked: {
     opacity: 0.6,
   },
+  setCol: { width: 40, alignItems: 'center' },
   setBox: {
     width: 32,
     height: 32,
@@ -108,7 +113,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   targetReps: {
-    width: 28,
+    width: 36,
     color: COLORS.textSecondary,
     fontSize: 13,
     textAlign: 'center',
@@ -133,3 +138,5 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
 });
+
+export default React.memo(ExerciseSetRow);

@@ -95,7 +95,31 @@ export const EXERCISE_CATALOG = [
   { id: 'ex-93', name: 'Seated calf raises', name_i18n: { es: 'Elevaciones de gemelos sentado' }, category: 'Machine', muscles: {     calves: 1 }, description: 'Sit on the machine seat and adjust the pads so they rest securely on your thighs. Unlock the weight by raising your heels using your calves, lifting onto the balls of your feet. Then lower your heels slowly back to the starting position.', description_i18n: { es: 'Sientate en la maquina y ajusta las almohadillas para que queden sobre los muslos. Desbloquea el peso elevando los talones y sube a puntas. Luego baja lento los talones a la posicion inicial.' }, image: require('../assets/workout-api-images/seated-calf-raises.svg') },
 ];
 
-export const CATEGORIES = ['All', 'Free weigth', 'Body weight', 'Machine', 'Cable']
+// Categorías tal y como aparecen en el campo `category` de cada ejercicio.
+export const CATEGORY_VALUES = ['Free weight', 'Body weight', 'Machine', 'Cable'];
+
+// Grupos musculares que entiende la app (mapa corporal, filtros y barras).
+export const MUSCLE_KEYS = [
+  'chest', 'shoulders', 'traps', 'triceps', 'biceps', 'forearms', 'lats', 'midBack',
+  'abs', 'obliques', 'glutes', 'hamstrings', 'quadriceps', 'adductors', 'abductors', 'calves',
+];
+
+export const getCategoryLabel = (category, t) => {
+  const map = t?.categoryLabels || {};
+  return map[category] || category || '';
+};
+
+// ─── Registro: catálogo + ejercicios personalizados ──────────────────────────
+// Los personalizados se cargan desde storage en ExercisesContext y se registran
+// aquí para que getExerciseById funcione igual para todos, sin hooks.
+const catalogById = new Map(EXERCISE_CATALOG.map((e) => [e.id, e]));
+let customById = new Map();
+
+export const registerCustomExercises = (list) => {
+  customById = new Map((list || []).map((e) => [e.id, e]));
+};
+
+export const getExerciseById = (id) => catalogById.get(id) || customById.get(id);
 
 export const getExerciseText = (exercise, language) => {
   if (!exercise) return { name: '', description: '' };
@@ -110,4 +134,28 @@ export const getExerciseName = (exercise, language) =>
 export const getExerciseDescription = (exercise, language) =>
   getExerciseText(exercise, language).description;
 
-export const getExerciseById = (id) => EXERCISE_CATALOG.find((e) => e.id === id);
+// Nombre para mostrar a partir de un id; usa el nombre guardado como respaldo
+// (p. ej. en el historial) si el ejercicio ya no existe.
+export const resolveExerciseName = (exerciseId, language, fallbackName) => {
+  const ex = getExerciseById(exerciseId);
+  return (ex && getExerciseName(ex, language)) || fallbackName || exerciseId;
+};
+
+// Valida y normaliza el reparto muscular introducido en porcentajes (0-100).
+// Devuelve ratios con la misma convención que el catálogo (suman 1).
+export const percentagesToRatios = (percentages) => {
+  const out = {};
+  Object.entries(percentages || {}).forEach(([k, v]) => {
+    const n = Number(v) || 0;
+    if (n > 0 && MUSCLE_KEYS.includes(k)) out[k] = Math.round(n * 10) / 1000;
+  });
+  return out;
+};
+
+export const ratiosToPercentages = (muscles) => {
+  const out = {};
+  Object.entries(muscles || {}).forEach(([k, v]) => {
+    out[k] = Math.round((Number(v) || 0) * 1000) / 10;
+  });
+  return out;
+};

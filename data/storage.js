@@ -1,9 +1,75 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
-  ROUTINES: '@gymapp_routines',
-  HISTORY:  '@gymapp_history',
-  RECORDS:  '@gymapp_records',
+  ROUTINES:         '@gymapp_routines',
+  HISTORY:          '@gymapp_history',
+  RECORDS:          '@gymapp_records',
+  CUSTOM_EXERCISES: '@gymapp_custom_exercises',
+  ACTIVE_WORKOUT:   '@gymapp_active_workout',
+};
+
+const readJSON = async (key, fallback) => {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    console.error(`Error reading ${key}:`, e);
+    return fallback;
+  }
+};
+
+const writeJSON = async (key, value) => {
+  await AsyncStorage.setItem(key, JSON.stringify(value));
+  return value;
+};
+
+// ─── EJERCICIOS PERSONALIZADOS ────────────────────────────────────────────────
+// Se guardan con la misma forma que los del catálogo (muscles con ratios que
+// suman 1), más `isCustom`, `imageUri` (data URI) y `deleted` (borrado lógico,
+// para que el historial antiguo siga mostrando el nombre).
+
+export const loadCustomExercises = () => readJSON(KEYS.CUSTOM_EXERCISES, []);
+
+export const saveCustomExercises = (list) => writeJSON(KEYS.CUSTOM_EXERCISES, list);
+
+// Quita un ejercicio de todas las rutinas que lo usan. Devuelve cuántas cambió.
+export const removeExerciseFromRoutines = async (exerciseId) => {
+  const routines = await loadRoutines();
+  let changed = 0;
+  const updated = routines.map((r) => {
+    const exercises = (r.exercises || []).filter((ex) => ex.exerciseId !== exerciseId);
+    if (exercises.length !== (r.exercises || []).length) changed += 1;
+    return { ...r, exercises };
+  });
+  if (changed > 0) await writeJSON(KEYS.ROUTINES, updated);
+  return changed;
+};
+
+export const countRoutinesUsingExercise = async (exerciseId) => {
+  const routines = await loadRoutines();
+  return routines.filter((r) => (r.exercises || []).some((ex) => ex.exerciseId === exerciseId)).length;
+};
+
+// ─── ENTRENAMIENTO ACTIVO ─────────────────────────────────────────────────────
+// Sesión en curso: se guarda en cada cambio para sobrevivir a recargas de la
+// web, cierres de la app o que el navegador descarte la pestaña.
+
+export const loadActiveWorkout = () => readJSON(KEYS.ACTIVE_WORKOUT, null);
+
+export const saveActiveWorkout = async (session) => {
+  try {
+    await writeJSON(KEYS.ACTIVE_WORKOUT, session);
+  } catch (e) {
+    console.error('Error saving active workout:', e);
+  }
+};
+
+export const clearActiveWorkout = async () => {
+  try {
+    await AsyncStorage.removeItem(KEYS.ACTIVE_WORKOUT);
+  } catch (e) {
+    console.error('Error clearing active workout:', e);
+  }
 };
 
 // ─── RUTINAS ──────────────────────────────────────────────────────────────────
@@ -146,7 +212,7 @@ export const clearHistory = async () => {
 // ─── DEBUG: borrar todo (útil en desarrollo) ──────────────────────────────────
 export const clearAllData = async () => {
   try {
-    await AsyncStorage.multiRemove([KEYS.ROUTINES, KEYS.HISTORY, KEYS.RECORDS]);
+    await AsyncStorage.multiRemove(Object.values(KEYS));
   } catch (e) {
     console.error('Error clearing all data:', e);
   }
