@@ -30,10 +30,12 @@ export const getElapsedMs = (session, now = Date.now()) => {
   return accumulatedMs + (runningSince ? Math.max(0, now - runningSince) : 0);
 };
 
-// Descanso = tiempo desde la última serie marcada (null si aún no hay ninguna).
-export const getRestMs = (session, now = Date.now()) => (
-  session?.lastSetAt ? Math.max(0, now - session.lastSetAt) : null
-);
+// Vueltas, como el cronómetro del iPhone: `laps.startMs` es el tiempo total
+// en el que empezó la vuelta actual y `laps.list` las vueltas terminadas
+// (la más reciente primero). Al pausar el total, la vuelta también se para.
+export const getLaps = (session) => session?.laps || { startMs: 0, list: [] };
+export const getLapMs = (session, now = Date.now()) =>
+  Math.max(0, getElapsedMs(session, now) - getLaps(session).startMs);
 
 const buildSession = (routine) => {
   const now = Date.now();
@@ -51,7 +53,7 @@ const buildSession = (routine) => {
     currentIndex: 0,
     startedAt: now,
     timer: { accumulatedMs: 0, runningSince: now },
-    lastSetAt: null,
+    laps: { startMs: 0, list: [] },
     updatedAt: now,
   };
 };
@@ -176,13 +178,23 @@ export function WorkoutProvider({ children }) {
     return { ...s, timer: { ...s.timer, runningSince: Date.now() } };
   }), [updateSession]);
 
+  // Restablecer (solo con el cronómetro parado, como en el iPhone): pone a
+  // cero el total y borra las vueltas.
   const resetTimer = useCallback(() => updateSession((s) => ({
     ...s,
     timer: { accumulatedMs: 0, runningSince: s.timer.runningSince ? Date.now() : null },
+    laps: { startMs: 0, list: [] },
   })), [updateSession]);
 
-  // Reinicia el cronómetro de descanso (al marcar una serie o a mano).
-  const restartRest = useCallback(() => updateSession((s) => ({ ...s, lastSetAt: Date.now() })), [updateSession]);
+  // Vuelta: cierra la vuelta actual y empieza otra; el total no se toca.
+  const lap = useCallback(() => updateSession((s) => {
+    const elapsed = getElapsedMs(s);
+    const laps = getLaps(s);
+    return {
+      ...s,
+      laps: { startMs: elapsed, list: [elapsed - laps.startMs, ...laps.list].slice(0, 50) },
+    };
+  }), [updateSession]);
 
   const value = useMemo(() => ({
     loaded,
@@ -194,8 +206,8 @@ export function WorkoutProvider({ children }) {
     pauseTimer,
     resumeTimer,
     resetTimer,
-    restartRest,
-  }), [loaded, session, startWorkout, updateSession, finishWorkout, discardWorkout, pauseTimer, resumeTimer, resetTimer, restartRest]);
+    lap,
+  }), [loaded, session, startWorkout, updateSession, finishWorkout, discardWorkout, pauseTimer, resumeTimer, resetTimer, lap]);
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>;
 }

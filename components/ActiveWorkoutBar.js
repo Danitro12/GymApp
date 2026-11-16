@@ -4,7 +4,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import { COLORS } from '../data/theme';
 import { useLanguage } from '../context/LanguageContext';
 import {
-  useWorkout, useNow, getElapsedMs, getRestMs, countCompletedExercises,
+  useWorkout, useNow, getElapsedMs, getLapMs, getLaps, countCompletedExercises,
 } from '../context/WorkoutContext';
 import { formatDuration } from '../utils/date';
 
@@ -13,14 +13,14 @@ export default function ActiveWorkoutBar({ onPress }) {
   const { t } = useLanguage();
   const { session } = useWorkout();
   const running = !!session?.timer?.runningSince;
-  const now = useNow(!!session);
+  const now = useNow(!!session && running);
   if (!session) return null;
 
   const elapsed = getElapsedMs(session, now) / 1000;
   const done = countCompletedExercises(session);
   const total = session.routine.exercises.length;
-  const restMs = getRestMs(session, now);
-  const rest = restMs === null ? null : Math.floor(restMs / 1000);
+  const hasLaps = getLaps(session).list.length > 0;
+  const lapSec = Math.floor(getLapMs(session, now) / 1000);
 
   return (
     <TouchableOpacity style={styles.bar} onPress={onPress} activeOpacity={0.9} accessibilityRole="button">
@@ -29,7 +29,7 @@ export default function ActiveWorkoutBar({ onPress }) {
         <Text style={styles.label}>{t.workoutInProgress}</Text>
         <Text style={styles.name} numberOfLines={1}>
           {session.routine.name} · {done}/{total}
-          {rest !== null ? ` · ${t.restLabel} ${Math.floor(rest / 60)}:${String(rest % 60).padStart(2, '0')}` : ''}
+          {hasLaps ? ` · ${t.lapLabel} ${Math.floor(lapSec / 60)}:${String(lapSec % 60).padStart(2, '0')}` : ''}
         </Text>
       </View>
       <Text style={[styles.time, !running && styles.timePaused]}>

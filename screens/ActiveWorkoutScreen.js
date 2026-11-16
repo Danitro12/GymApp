@@ -4,7 +4,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import Svg, { Circle } from 'react-native-svg';
 import { COLORS } from '../data/theme';
 import ExerciseSetRow from '../components/ExerciseSetRow';
 import ExerciseThumb from '../components/ExerciseThumb';
@@ -13,7 +12,7 @@ import { getExerciseById, getCategoryLabel, resolveExerciseName } from '../data/
 import { loadRoutineRecords } from '../data/storage';
 import { useLanguage } from '../context/LanguageContext';
 import {
-  useWorkout, useNow, getElapsedMs, getRestMs, countCompletedExercises,
+  useWorkout, useNow, getElapsedMs, getLapMs, getLaps, countCompletedExercises,
 } from '../context/WorkoutContext';
 import { confirmAsync } from '../utils/dialogs';
 import { formatDuration } from '../utils/date';
@@ -23,7 +22,7 @@ export default function ActiveWorkoutScreen({ navigation }) {
   const { t, language } = useLanguage();
   const {
     session, loaded, updateSession, finishWorkout, discardWorkout,
-    pauseTimer, resumeTimer, resetTimer, restartRest,
+    pauseTimer, resumeTimer, resetTimer, lap,
   } = useWorkout();
   const scrollRef = useRef(null);
   const chipsRef = useRef(null);
@@ -31,9 +30,7 @@ export default function ActiveWorkoutScreen({ navigation }) {
   const [busy, setBusy] = useState(false);
 
   const running = !!session?.timer?.runningSince;
-  // Tic cada segundo mientras haya sesión: el descanso cuenta aunque el
-  // cronómetro total esté en pausa.
-  const now = useNow(!!session, 1000);
+  const now = useNow(!!session && running, 1000);
 
   const leave = useCallback(() => {
     if (navigation.canGoBack()) navigation.goBack();
@@ -63,8 +60,7 @@ export default function ActiveWorkoutScreen({ navigation }) {
   const { routine, exerciseSets } = session;
   const total = exerciseSets.length;
   const elapsedSec = getElapsedMs(session, now) / 1000;
-  const restMs = getRestMs(session, now);
-  const restSec = restMs === null ? null : restMs / 1000;
+
 
   const setIndex = (i) => updateSession((s) => ({ ...s, currentIndex: Math.max(0, Math.min(total - 1, i)) }));
 
@@ -72,7 +68,6 @@ export default function ActiveWorkoutScreen({ navigation }) {
     const value = sanitizeNumberInput(raw);
     updateSession((s) => {
       const next = [...s.exerciseSets];
-      let justChecked = false;
       next[exIndex] = {
         ...next[exIndex],
         sets: next[exIndex].sets.map((set, i) => {
@@ -80,24 +75,21 @@ export default function ActiveWorkoutScreen({ navigation }) {
           const updated = { ...set, [field]: value };
           // Se marca sola cuando reps y peso están rellenos.
           updated.checked = updated.reps !== '' && updated.weight !== '';
-          justChecked = updated.checked && !set.checked;
           return updated;
         }),
       };
-      // Al completar una serie empieza a contar el descanso.
-      return { ...s, exerciseSets: next, lastSetAt: justChecked ? Date.now() : s.lastSetAt };
+      return { ...s, exerciseSets: next };
     });
   };
 
   const toggleCheck = (exIndex, sIdx) => {
     updateSession((s) => {
       const next = [...s.exerciseSets];
-      const wasChecked = next[exIndex].sets[sIdx]?.checked;
       next[exIndex] = {
         ...next[exIndex],
         sets: next[exIndex].sets.map((set, i) => (i === sIdx ? { ...set, checked: !set.checked } : set)),
       };
-      return { ...s, exerciseSets: next, lastSetAt: !wasChecked ? Date.now() : s.lastSetAt };
+      return { ...s, exerciseSets: next };
     });
   };
 
@@ -235,40 +227,15 @@ export default function ActiveWorkoutScreen({ navigation }) {
         )}
       </ScrollView>
 
-      {/* Relojes: descanso (desde la última serie) + duración total */}
-      <View style={styles.clockPanel}>
-        <TouchableOpacity
-          onPress={restartRest}
-          disabled={restSec === null}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`${t.restLabel}: ${t.tapToRestart}`}
-        >
-          <RestRing seconds={restSec} size={104} label={t.restLabel} hint={restSec === null ? t.markASet : t.tapToRestart} />
-        </TouchableOpacity>
-
-        <View style={styles.totalBox}>
-          <Text style={styles.clockLabel}>
-            {t.totalLabelTime}{!running ? ` · ${t.paused}` : ''}
-          </Text>
-          <Text style={[styles.totalBig, !running && styles.timerPaused]} numberOfLines={1} adjustsFontSizeToFit>
-            {formatDuration(elapsedSec)}
-          </Text>
-          <View style={styles.timerButtons}>
-            <TouchableOpacity
-              style={[styles.timerBtn, !running && styles.timerBtnPlay]}
-              onPress={running ? pauseTimer : resumeTimer}
-              activeOpacity={0.8}
-              accessibilityLabel={running ? 'Pause timer' : 'Resume timer'}
-            >
-              <Icon name={running ? 'pause' : 'play-arrow'} size={24} color={COLORS.white} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.timerBtn} onPress={resetTimer} activeOpacity={0.8} accessibilityLabel="Reset timer">
-              <Icon name="replay" size={22} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+      {/* Cronómetro estilo iPhone: total + vuelta actual */}
+      <Stopwatch
+        session={session}
+        t={t}
+        onLap={lap}
+        onReset={resetTimer}
+        onStart={resumeTimer}
+        onStop={pauseTimer}
+      />
 
       <View style={styles.bottomBar}>
         <TouchableOpacity
@@ -296,49 +263,72 @@ export default function ActiveWorkoutScreen({ navigation }) {
   );
 }
 
-// Anillo de descanso: da una vuelta completa por minuto, como la aguja de
-// segundos de un cronómetro; el tiempo exacto va en el centro.
-function RestRing({ seconds, size, label, hint }) {
-  const stroke = 7;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const has = seconds !== null;
-  const secs = has ? Math.floor(seconds) : 0;
-  const progress = has ? (secs % 60) / 60 : 0;
-  const minutes = Math.floor(secs / 60);
+// Cronómetro con vueltas, como el del iPhone. Va en su propio componente
+// para refrescarse cada 100 ms (décimas) sin redibujar toda la pantalla.
+function Stopwatch({ session, t, onLap, onReset, onStart, onStop }) {
+  const running = !!session?.timer?.runningSince;
+  const now = useNow(running, 100);
+  const elapsedSec = getElapsedMs(session, now) / 1000;
+  const lapSec = getLapMs(session, now) / 1000;
+  const laps = getLaps(session);
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke={COLORS.border} strokeWidth={stroke} fill="transparent" />
-        {has && progress > 0 && (
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            stroke={COLORS.orange}
-            strokeWidth={stroke}
-            fill="transparent"
-            strokeDasharray={`${progress * c} ${c}`}
-            strokeLinecap="round"
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
-        )}
-      </Svg>
-      <Text style={ring.label}>{label}</Text>
-      <Text style={[ring.time, !has && ring.timeEmpty]}>
-        {has ? `${minutes}:${String(secs % 60).padStart(2, '0')}` : '0:00'}
-      </Text>
-      <Text style={ring.hint} numberOfLines={1}>{hint}</Text>
+    <View style={styles.clockPanel}>
+      <View style={styles.clockRow}>
+        <TouchableOpacity
+          style={[styles.roundBtn, styles.roundBtnGrey, !running && laps.list.length === 0 && elapsedSec < 1 && styles.roundBtnDisabled]}
+          onPress={running ? onLap : onReset}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={running ? t.lapBtn : t.resetBtn}
+        >
+          <Text style={[styles.roundBtnText, !running && styles.roundBtnTextSmall]} numberOfLines={1}>{running ? t.lapBtn : t.resetBtn}</Text>
+        </TouchableOpacity>
+
+        <View style={styles.clockCenter}>
+          <Text style={[styles.totalBig, !running && styles.timerPaused]} numberOfLines={1} adjustsFontSizeToFit>
+            {formatClock(elapsedSec)}
+          </Text>
+          <Text style={styles.lapNow}>
+            {t.lapLabel} {laps.list.length + 1} · <Text style={styles.lapNowTime}>{formatClock(lapSec)}</Text>
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.roundBtn, running ? styles.roundBtnStop : styles.roundBtnStart]}
+          onPress={running ? onStop : onStart}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={running ? t.stopBtn : t.startBtn}
+        >
+          <Text style={[styles.roundBtnText, running ? styles.stopText : styles.startText]}>
+            {running ? t.stopBtn : t.startBtn}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {laps.list.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.lapsRow}>
+          {laps.list.map((ms, i) => (
+            <View key={`${laps.list.length - i}`} style={styles.lapChip}>
+              <Text style={styles.lapChipLabel}>{t.lapLabel} {laps.list.length - i}</Text>
+              <Text style={styles.lapChipTime}>{formatClock(ms / 1000)}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
 
-const ring = StyleSheet.create({
-  label: { color: COLORS.orange, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
-  time: { color: COLORS.white, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'], marginVertical: 1 },
-  timeEmpty: { color: COLORS.textMuted },
-  hint: { color: COLORS.textMuted, fontSize: 10, fontWeight: '600', maxWidth: 88, textAlign: 'center' },
-});
+// mm:ss,d con décimas, como el cronómetro del iPhone (h:mm:ss si pasa de una hora).
+const formatClock = (totalSeconds) => {
+  const secs = Math.max(0, totalSeconds);
+  if (secs >= 3600) return formatDuration(secs);
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  const d = Math.floor((secs * 10) % 10);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${d}`;
+};
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
@@ -369,18 +359,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
   colLabel: { color: COLORS.textSecondary, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'center' },
-  clockPanel: {
-    flexDirection: 'row', alignItems: 'center', gap: 16,
-    marginHorizontal: 16, marginBottom: 10, padding: 12, paddingRight: 16,
-    backgroundColor: COLORS.card, borderRadius: 20,
-  },
-  totalBox: { flex: 1, alignItems: 'center', gap: 6 },
-  clockLabel: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
-  totalBig: { color: COLORS.white, fontSize: 36, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  clockPanel: { marginHorizontal: 16, marginBottom: 10, paddingVertical: 14, paddingHorizontal: 12, backgroundColor: COLORS.card, borderRadius: 20 },
+  clockRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  clockCenter: { flex: 1, alignItems: 'center' },
+  totalBig: { color: COLORS.white, fontSize: 40, fontWeight: '300', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
   timerPaused: { color: COLORS.textSecondary },
-  timerButtons: { flexDirection: 'row', gap: 10 },
-  timerBtn: { width: 46, height: 40, borderRadius: 12, backgroundColor: COLORS.cardDark, alignItems: 'center', justifyContent: 'center' },
-  timerBtnPlay: { backgroundColor: COLORS.green },
+  lapNow: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '600', marginTop: 2 },
+  lapNowTime: { color: COLORS.white, fontVariant: ['tabular-nums'] },
+  roundBtn: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  roundBtnGrey: { backgroundColor: '#333333', borderColor: '#3d3d3d' },
+  roundBtnStart: { backgroundColor: '#0f3a1d', borderColor: '#14532d' },
+  roundBtnStop: { backgroundColor: '#3a1414', borderColor: '#5a1d1d' },
+  roundBtnDisabled: { opacity: 0.45 },
+  roundBtnText: { color: COLORS.white, fontSize: 13, fontWeight: '600' },
+  roundBtnTextSmall: { fontSize: 12 },
+  startText: { color: '#4ade80' },
+  stopText: { color: '#f87171' },
+  lapsRow: { gap: 8, paddingTop: 12 },
+  lapChip: { backgroundColor: COLORS.cardDark, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center' },
+  lapChipLabel: { color: COLORS.textMuted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  lapChipTime: { color: COLORS.white, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
   navBtn: { width: 52, height: 52, borderRadius: 14, backgroundColor: COLORS.card, alignItems: 'center', justifyContent: 'center' },
   navBtnDisabled: { opacity: 0.35 },
   bottomBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 12, paddingTop: 2 },

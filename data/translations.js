@@ -165,10 +165,11 @@ const translations = {
     start: 'Start',
     continueWorkout: 'Continue workout',
     emptyRoutine: 'This routine has no exercises yet.',
-    restLabel: 'Rest',
-    totalLabelTime: 'Workout',
-    tapToRestart: 'Tap to reset',
-    markASet: 'No sets yet',
+    lapLabel: 'Lap',
+    lapBtn: 'Lap',
+    resetBtn: 'Reset',
+    startBtn: 'Start',
+    stopBtn: 'Stop',
 
     // Home extras
     restDay: 'No routine scheduled for today',
@@ -402,10 +403,11 @@ const translations = {
     start: 'Empezar',
     continueWorkout: 'Continuar entreno',
     emptyRoutine: 'Esta rutina aún no tiene ejercicios.',
-    restLabel: 'Descanso',
-    totalLabelTime: 'Entreno',
-    tapToRestart: 'Toca: reiniciar',
-    markASet: 'Sin series aún',
+    lapLabel: 'Vuelta',
+    lapBtn: 'Vuelta',
+    resetBtn: 'Restablecer',
+    startBtn: 'Iniciar',
+    stopBtn: 'Detener',
 
     // Extras de inicio
     restDay: 'Hoy no tienes rutina programada',
