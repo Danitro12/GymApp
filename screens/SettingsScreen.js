@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../data/theme';
 import { useLanguage } from '../context/LanguageContext';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import { clearAllData } from '../data/storage';
 
 const LANGUAGES = [
@@ -12,7 +13,7 @@ const LANGUAGES = [
   { code: 'es', flag: 'ES', name: 'Español', native: 'Spanish' },
 ];
 const DEBUG = __DEV__;
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const { language, setLanguage, t } = useLanguage();
   const [shouldClear, setShouldClear] = useState(false);
 
@@ -82,6 +83,21 @@ export default function SettingsScreen() {
 
 
         </View>
+
+        {/* Datos: importar / exportar */}
+        <View style={{ height: 15 }} />
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Data')} activeOpacity={0.85}>
+          <View style={[styles.cardHeader, { marginBottom: 0 }]}>
+            <View style={styles.iconWrap}>
+              <Icon name="import-export" size={22} color={COLORS.orange} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>{t.dataMenu}</Text>
+              <Text style={styles.cardSub}>{t.dataMenuSub}</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={COLORS.textSecondary} />
+          </View>
+        </TouchableOpacity>
 
         {DEBUG && (
           <>

@@ -49,6 +49,15 @@ export default function RoutinesScreen({ navigation }) {
             <Text style={styles.title}>{t.myRoutines}</Text>
             <Text style={styles.sub}>{routines.length} {routines.length === 1 ? t.routine.toLowerCase() : t.routinesPl}</Text>
           </View>
+          <View style={styles.headerBtns}>
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            onPress={() => navigation.navigate('Data')}
+            activeOpacity={0.85}
+            accessibilityLabel={t.dataTitle}
+          >
+            <Icon name="import-export" size={22} color={COLORS.white} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => navigation.navigate('CreateRoutine')}
@@ -57,6 +66,7 @@ export default function RoutinesScreen({ navigation }) {
           >
             <Icon name="add" size={26} color={COLORS.white} />
           </TouchableOpacity>
+          </View>
         </View>
 
         {routines.length === 0 && (
@@ -171,6 +181,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   title: { color: COLORS.white, fontSize: 28, fontWeight: '800', marginBottom: 4 },
   sub: { color: COLORS.textSecondary, fontSize: 14 },
+  headerBtns: { flexDirection: 'row', gap: 8 },
+  secondaryBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
   addBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.orange, alignItems: 'center', justifyContent: 'center' },
   emptyBox: {
     backgroundColor: COLORS.card, borderRadius: 16, padding: 32, alignItems: 'center', gap: 8,
