@@ -1,17 +1,18 @@
-import React, { createContext, useContext, useRef } from 'react';
+import React, { createContext, useContext, useMemo, useRef } from 'react';
 
-const TabContext = createContext({ switchTab: () => { } });
+const TabContext = createContext({ switchTab: () => { }, registerSwitch: () => { } });
+
 export function TabProvider({ children }) {
-  // Will be overwritten by TabNavigator after mount
+  // TabNavigator registra aquí la función real al montarse.
   const switchTabRef = useRef(() => { });
-  const value = {
-    // Call with a tab name string: 'Home' | 'Routines' | 'History' | 'Muscles' | 'Settings'
+  const value = useMemo(() => ({
+    // Nombre de pestaña: 'Home' | 'Routines' | 'Exercises' | 'Muscles' | 'Settings'
     switchTab: (tabName) => switchTabRef.current(tabName),
-    // Allows TabNavigator to register the actual switch function
     registerSwitch: (fn) => { switchTabRef.current = fn; },
-  };
+  }), []);
   return <TabContext.Provider value={value}>{children}</TabContext.Provider>;
 }
+
 export function useTab() {
   return useContext(TabContext);
 }

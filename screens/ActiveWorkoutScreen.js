@@ -1,87 +1,94 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, findNodeHandle, Animated, Platform
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, findNodeHandle, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import { COLORS } from '../data/theme';
 import ExerciseSetRow from '../components/ExerciseSetRow';
-import { getExerciseById, getExerciseName } from '../data/exercises';
-import { saveWorkoutToHistory, updateRoutineRecords, loadRoutineRecords } from '../data/storage';
+import ExerciseThumb from '../components/ExerciseThumb';
+import ScreenHeader, { HeaderIconButton } from '../components/ScreenHeader';
+import { getExerciseById, getCategoryLabel, resolveExerciseName } from '../data/exercises';
+import { loadRoutineRecords } from '../data/storage';
 import { useLanguage } from '../context/LanguageContext';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import {
+  useWorkout, useNow, getElapsedMs, countCompletedExercises,
+} from '../context/WorkoutContext';
+import { confirmAsync } from '../utils/dialogs';
+import { formatDuration } from '../utils/date';
+import { fmt, sanitizeNumberInput } from '../utils/text';
 
-const AnimatedIcon = Animated.createAnimatedComponent(Icon)
-export default function ActiveWorkoutScreen({ route, navigation }) {
+export default function ActiveWorkoutScreen({ navigation }) {
   const { t, language } = useLanguage();
-  const { routine } = route.params;
+  const {
+    session, loaded, updateSession, finishWorkout, discardWorkout,
+    pauseTimer, resumeTimer, resetTimer,
+  } = useWorkout();
   const scrollRef = useRef(null);
-  const [idxexercise, setExercise] = useState(0);
-  const idx = 0;
-  const buildInitialSets = () =>
-    routine.exercises.map((ex) => ({
-      exerciseId: ex.exerciseId,
-      sets: ex.sets.map((set, i) => ({
-        id: i + 1, reps: '', weight: '', checked: false,
-      })),
-    }));
-
-  const [exerciseSets, setExerciseSets] = useState(buildInitialSets);
+  const chipsRef = useRef(null);
   const [routineRecords, setRoutineRecords] = useState({});
-  const [elapsed, setElapsed]           = useState(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(true);
-  const timerRef                        = useRef(null);
+  const [busy, setBusy] = useState(false);
+
+  const running = !!session?.timer?.runningSince;
+  const now = useNow(!!session && running, 1000);
+
+  const leave = useCallback(() => {
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('Tabs');
+  }, [navigation]);
+
+  // Si no hay sesión (p. ej. se descartó), volvemos atrás.
+  useEffect(() => {
+    if (loaded && !session && !busy) leave();
+  }, [loaded, session, busy, leave]);
+
+  const routineId = session?.routine?.id;
+  useEffect(() => {
+    if (routineId) loadRoutineRecords(routineId).then(setRoutineRecords);
+  }, [routineId]);
+
+  const idx = session ? Math.min(session.currentIndex || 0, Math.max(0, session.exerciseSets.length - 1)) : 0;
 
   useEffect(() => {
-    if (!isTimerRunning) return () => {};
-    timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(timerRef.current);
-  }, [isTimerRunning]);
+    scrollRef.current?.scrollTo?.({ y: 0, animated: false });
+  }, [idx]);
 
-  useEffect(() => {
-    loadRoutineRecords(routine.id).then(setRoutineRecords);
-  }, [routine.id]);
+  const completedCount = useMemo(() => countCompletedExercises(session), [session]);
 
+  if (!session) return <SafeAreaView style={styles.safe} />;
 
-  const formatTime = (secs) => {
-    const m = String(Math.floor(secs / 60)).padStart(2, '0');
-    const s = String(secs % 60).padStart(2, '0');
-    return `${m}:${s}`;
-  };
+  const { routine, exerciseSets } = session;
+  const total = exerciseSets.length;
+  const elapsedSec = getElapsedMs(session, now) / 1000;
 
-  const completedCount = exerciseSets.filter((ex) => ex.sets.every((s) => s.checked)).length;
+  const setIndex = (i) => updateSession((s) => ({ ...s, currentIndex: Math.max(0, Math.min(total - 1, i)) }));
 
-  const updateSet = (exIndex, setIndex, field, value) => {
-    setExerciseSets((prev) => {
-      const next = [...prev];
+  const updateSet = (exIndex, sIdx, field, raw) => {
+    const value = sanitizeNumberInput(raw);
+    updateSession((s) => {
+      const next = [...s.exerciseSets];
       next[exIndex] = {
         ...next[exIndex],
-        sets: next[exIndex].sets.map((s, i) => {
-          if (i === setIndex) {
-            const updated = { ...s, [field]: value };
-            // Auto-check if both fields are filled (not empty strings)
-            if (updated.reps !== '' && updated.weight !== '') {
-              updated.checked = true;
-            } else {
-              updated.checked = false;
-            }
-            return updated;
-          }
-          return s;
-        })
+        sets: next[exIndex].sets.map((set, i) => {
+          if (i !== sIdx) return set;
+          const updated = { ...set, [field]: value };
+          // Se marca sola cuando reps y peso están rellenos.
+          updated.checked = updated.reps !== '' && updated.weight !== '';
+          return updated;
+        }),
       };
-      return next;
+      return { ...s, exerciseSets: next };
     });
   };
 
-  const handleWeightSubmit = (exIndex, setIndex) => {
-    setExerciseSets((prev) => {
-      const next = [...prev];
-      const set = next[exIndex].sets[setIndex];
-      if (set.reps && set.weight) {
-        set.checked = true;
-      }
-      return next;
+  const toggleCheck = (exIndex, sIdx) => {
+    updateSession((s) => {
+      const next = [...s.exerciseSets];
+      next[exIndex] = {
+        ...next[exIndex],
+        sets: next[exIndex].sets.map((set, i) => (i === sIdx ? { ...set, checked: !set.checked } : set)),
+      };
+      return { ...s, exerciseSets: next };
     });
   };
 
@@ -90,176 +97,175 @@ export default function ActiveWorkoutScreen({ route, navigation }) {
     const node = inputRef?.current ? findNodeHandle(inputRef.current) : null;
     const responder = scrollRef.current?.getScrollResponder?.();
     if (node && responder?.scrollResponderScrollNativeHandleToKeyboard) {
-      setTimeout(() => {
-        responder.scrollResponderScrollNativeHandleToKeyboard(node, 150, true);
-      }, 0);
+      setTimeout(() => responder.scrollResponderScrollNativeHandleToKeyboard(node, 150, true), 0);
     }
   };
 
-  const toggleCheck = (exIndex, setIndex) => {
-    setExerciseSets((prev) => {
-      const next = [...prev];
-      next[exIndex] = { ...next[exIndex], sets: next[exIndex].sets.map((s, i) => i === setIndex ? { ...s, checked: !s.checked } : s) };
-      return next;
+  const handleFinish = async () => {
+    const msg = `${t.finishWorkoutMsg} ${completedCount}/${total} ${t.finishExercisesIn} ${formatDuration(elapsedSec)}.`;
+    const ok = await confirmAsync(t.finishWorkoutQ, msg, { confirmText: t.finish, cancelText: t.keepGoing });
+    if (!ok) return;
+    setBusy(true);
+    await finishWorkout();
+    leave();
+  };
+
+  const handleDiscard = async () => {
+    const ok = await confirmAsync(t.discardWorkoutQ, t.discardWorkoutMsg, {
+      confirmText: t.discard, cancelText: t.keepGoing, destructive: true,
     });
+    if (!ok) return;
+    setBusy(true);
+    await discardWorkout();
+    leave();
   };
 
-  const handleFinish = () => {
-    const msg = `${t.finishWorkoutMsg} ${completedCount}/${routine.exercises.length} ${t.finishExercisesIn} ${formatTime(elapsed)}.`;
-    const onFinish = async () => {
-      clearInterval(timerRef.current);
-      const today = new Date().toISOString().split('T')[0];
-      await saveWorkoutToHistory({
-        id:                 `h_${Date.now()}`,
-        routineId:          routine.id,
-        routineName:        routine.name,
-        date:               today,
-        duration:           Math.round(elapsed / 60),
-        exercisesCompleted: completedCount,
-        totalExercises:     routine.exercises.length,
-        sets:               exerciseSets,
-      });
-      await updateRoutineRecords(routine.id, exerciseSets);
-      navigation.goBack();
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`${t.finishWorkoutQ}\n\n${msg}`)) {
-        onFinish();
-      }
-    } else {
-      Alert.alert(
-        t.finishWorkoutQ,
-        msg,
-        [
-          { text: t.keepGoing, style: 'cancel' },
-          { text: t.finish, onPress: onFinish },
-        ]
-      );
-    }
-  };
-
-  const toggleTimer = () => setIsTimerRunning((prev) => !prev);
-  const resetTimer = () => setElapsed(0);
-
-  const openExerciseInfo = (exerciseId) => {
-    navigation.navigate('ExerciseInfo', { exerciseId });
-  };
-
+  const exData = exerciseSets[idx];
+  const exercise = exData ? getExerciseById(exData.exerciseId) : null;
+  const exerciseName = exData ? resolveExerciseName(exData.exerciseId, language) : '';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => {
-          if (Platform.OS === 'web') {
-            if (window.confirm(`${t.cancelWorkout}\n\n${t.cancelWorkoutMsg}`)) {
-              navigation.goBack();
-            }
-          } else {
-            Alert.alert(t.cancelWorkout, t.cancelWorkoutMsg, [
-              { text: t.keepGoing, style: 'cancel' },
-              { text: t.cancel, style: 'destructive', onPress: () => navigation.goBack() },
-            ]);
-          }
-        }} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <View style={{ width: 44 }} />
-      </View>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
+      <ScreenHeader
+        onBack={leave}
+        backIcon="keyboard-arrow-down"
+        title={routine.name}
+        subtitle={`${completedCount}/${total} ${t.exercises}`}
+        right={<HeaderIconButton icon="delete-outline" color="#ef4444" onPress={handleDiscard} label={t.discardWorkout} />}
+      />
 
-      <View style={styles.titleSection}>
-        <Text style={styles.title}>{routine.name}</Text>
-        <Text style={styles.sub}>{completedCount}/{routine.exercises.length} {t.exercises}</Text>
+      <View style={styles.progressWrap}>
         <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${(completedCount / routine.exercises.length) * 100}%` }]} />
+          <View style={[styles.progressFill, { width: `${total ? (completedCount / total) * 100 : 0}%` }]} />
         </View>
       </View>
+
+      {/* Saltar a cualquier ejercicio */}
+      <ScrollView
+        ref={chipsRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipsScroll}
+        contentContainerStyle={styles.chips}
+      >
+        {exerciseSets.map((ex, i) => {
+          const done = ex.sets.length > 0 && ex.sets.every((s) => s.checked);
+          const active = i === idx;
+          return (
+            <TouchableOpacity
+              key={`${ex.exerciseId}-${i}`}
+              onPress={() => setIndex(i)}
+              style={[styles.chip, done && styles.chipDone, active && styles.chipActive]}
+              activeOpacity={0.8}
+            >
+              {done && <Icon name="check" size={14} color={active ? COLORS.white : COLORS.green} />}
+              <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
+                {i + 1}. {resolveExerciseName(ex.exerciseId, language)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-
-      {(() => {
-        const exData = exerciseSets[idxexercise];
-        const exIndex = idxexercise;
-        const exercise = getExerciseById(exData.exerciseId);
-        return (
-          <View key={exData.exerciseId + exIndex} style={styles.exCard}>
+        {exData && (
+          <View style={styles.exCard}>
             <View style={styles.exTitleRow}>
-              <Text style={styles.exName}>{getExerciseName(exercise, language) || exData.exerciseId}</Text>
-              <TouchableOpacity
-                onPress={() => openExerciseInfo(exData.exerciseId)}
-                style={styles.infoBtn}
-                activeOpacity={0.8}
-              >
-                <Icon name="info-outline" size={20} color={COLORS.textSecondary} />
-              </TouchableOpacity>
+              <ExerciseThumb exercise={exercise} size={52} radius={12} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.exOf}>{fmt(t.exerciseOf, { i: idx + 1, n: total })}</Text>
+                <Text style={styles.exName}>{exerciseName}</Text>
+                {!!exercise?.category && <Text style={styles.exCat}>{getCategoryLabel(exercise.category, t)}</Text>}
+              </View>
+              {!!exercise && (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('ExerciseInfo', { exerciseId: exData.exerciseId })}
+                  style={styles.infoBtn}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="info-outline" size={20} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              )}
             </View>
-            <Text style={styles.exCat}>{exercise?.category}</Text>
+
             <View style={styles.colHeaders}>
-              <Text style={[styles.colLabel, { width: 32, textAlign: 'center' }]}>{t.set}</Text>
-              <Text style={[styles.colLabel, { flex: 1, textAlign: 'center' }]}>{t.record}</Text>
-              <Text style={[styles.colLabel, { width: 28, textAlign: 'center' }]}></Text>
-              <Text style={[styles.colLabel, { flex: 1.2, textAlign: 'center' }]}>{t.reps}</Text>
-              <Text style={[styles.colLabel, { flex: 1.2, textAlign: 'center' }]}>{t.weight}</Text>
+              <Text style={[styles.colLabel, { width: 40 }]} numberOfLines={1}>{t.set}</Text>
+              <Text style={[styles.colLabel, { flex: 1 }]} numberOfLines={1}>{t.record}</Text>
+              <Text style={[styles.colLabel, { width: 36 }]} numberOfLines={1}>{t.goal}</Text>
+              <Text style={[styles.colLabel, { flex: 1.2 }]} numberOfLines={1}>{t.reps}</Text>
+              <Text style={[styles.colLabel, { flex: 1.2 }]} numberOfLines={1}>{t.weight}</Text>
               <View style={{ width: 36 }} />
             </View>
-            {exData.sets.map((set, setIndex) => {
-              const record = routineRecords?.[exData.exerciseId]?.[setIndex];
-              const recordText = record ? `${record.maxRepsAtMaxWeight}x${record.maxWeight}` : '-';
 
+            {exData.sets.map((set, sIdx) => {
+              const record = routineRecords?.[exData.exerciseId]?.[sIdx];
+              const recordText = record ? `${record.maxRepsAtMaxWeight}×${record.maxWeight}` : '-';
               return (
-              <ExerciseSetRow
-                key={set.id}
-                set={set.id}
-                previous={recordText}
-                targetReps={routine.exercises?.[exIndex]?.sets?.[setIndex]?.reps}
-                reps={set.reps}
-                weight={set.weight}
-                checked={set.checked}
-                onRepsChange={(v) => updateSet(exIndex, setIndex, 'reps', v)}
-                onWeightChange={(v) => updateSet(exIndex, setIndex, 'weight', v)}
-                onWeightSubmit={() => handleWeightSubmit(exIndex, setIndex)}
-                onCheck={() => toggleCheck(exIndex, setIndex)}
-                onInputFocus={handleInputFocus}
-              />
+                <ExerciseSetRow
+                  key={set.id}
+                  set={set.id}
+                  previous={recordText}
+                  targetReps={routine.exercises?.[idx]?.sets?.[sIdx]?.reps || ''}
+                  reps={set.reps}
+                  weight={set.weight}
+                  checked={set.checked}
+                  onRepsChange={(v) => updateSet(idx, sIdx, 'reps', v)}
+                  onWeightChange={(v) => updateSet(idx, sIdx, 'weight', v)}
+                  onCheck={() => toggleCheck(idx, sIdx)}
+                  onInputFocus={handleInputFocus}
+                />
               );
             })}
-
           </View>
-        );
-      })()}
+        )}
       </ScrollView>
-      <View style={styles.switchContainer}>
-        <TouchableOpacity style={styles.btnswitch} onPress={() => {setExercise((prev) => Math.max(0, prev - 1)); }}>
-          <AnimatedIcon name="arrow-back-ios" size={20} color={COLORS.white} />
+
+      <View style={styles.controls}>
+        <TouchableOpacity
+          style={[styles.navBtn, idx === 0 && styles.navBtnDisabled]}
+          onPress={() => setIndex(idx - 1)}
+          disabled={idx === 0}
+          accessibilityLabel="Previous exercise"
+        >
+          <Icon name="chevron-left" size={28} color={COLORS.white} />
         </TouchableOpacity>
-        <View style={styles.timerControls}>
-          <Text style={styles.timerBig}>{formatTime(elapsed)}</Text>
+
+        <View style={styles.timerBox}>
+          <Text style={[styles.timerBig, !running && styles.timerPaused]}>{formatDuration(elapsedSec)}</Text>
           <View style={styles.timerButtons}>
-            <TouchableOpacity style={styles.timerBtn} onPress={toggleTimer} activeOpacity={0.8}>
-              <AnimatedIcon
-                name={isTimerRunning ? 'stop' : 'play-arrow'}
-                size={40}
-                color={isTimerRunning ? '#ef4444' : '#22c55e'}
-              />
+            <TouchableOpacity
+              style={styles.timerBtn}
+              onPress={running ? pauseTimer : resumeTimer}
+              activeOpacity={0.8}
+              accessibilityLabel={running ? 'Pause timer' : 'Resume timer'}
+            >
+              <Icon name={running ? 'pause' : 'play-arrow'} size={26} color={running ? COLORS.white : COLORS.green} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.timerBtn} onPress={resetTimer} activeOpacity={0.8}>
-              <AnimatedIcon name="refresh" size={40} color={COLORS.white} />
+            <TouchableOpacity style={styles.timerBtn} onPress={resetTimer} activeOpacity={0.8} accessibilityLabel="Reset timer">
+              <Icon name="replay" size={24} color={COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity style={styles.btnswitch} onPress={() => {setExercise((prev) => Math.min(exerciseSets.length - 1, prev + 1)); }}>
-          <AnimatedIcon name="arrow-forward-ios" size={20} color={COLORS.white} />
+
+        <TouchableOpacity
+          style={[styles.navBtn, idx >= total - 1 && styles.navBtnDisabled]}
+          onPress={() => setIndex(idx + 1)}
+          disabled={idx >= total - 1}
+          accessibilityLabel="Next exercise"
+        >
+          <Icon name="chevron-right" size={28} color={COLORS.white} />
         </TouchableOpacity>
       </View>
-            
 
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} activeOpacity={0.85} disabled={busy}>
+          <Icon name="flag" size={20} color={COLORS.white} />
           <Text style={styles.finishText}>{t.finishWorkout}</Text>
         </TouchableOpacity>
       </View>
@@ -268,39 +274,46 @@ export default function ActiveWorkoutScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: COLORS.background },
-  topBar:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  backBtn:  { padding: 4 },
-  backIcon: { color: COLORS.white, fontSize: 22 },
-  timerBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.card, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  timerIcon:{ fontSize: 14, color: COLORS.orange },
-  timer:    { color: COLORS.orange, fontSize: 15, fontWeight: '700' },
-  titleSection: { paddingHorizontal: 20, paddingBottom: 16 },
-  title: { color: COLORS.white, fontSize: 26, fontWeight: '800', marginBottom: 4 },
-  sub:   { color: COLORS.textSecondary, fontSize: 13, marginBottom: 10 },
-  progressBar:  { height: 4, backgroundColor: COLORS.border, borderRadius: 2, overflow: 'hidden' },
+  safe: { flex: 1, backgroundColor: COLORS.background },
+  progressWrap: { paddingHorizontal: 20, paddingBottom: 6 },
+  progressBar: { height: 4, backgroundColor: COLORS.border, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: COLORS.orange, borderRadius: 2 },
-  scroll:  { flex: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 200 },
-  exCard:  { backgroundColor: COLORS.card, borderRadius: 16, padding: 18, marginBottom: 16 },
-  exTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  exName:  { color: COLORS.white, fontSize: 18, fontWeight: '700', flex: 1 },
-  infoBtn: { padding: 6, borderRadius: 10, backgroundColor: COLORS.cardDark },
-  exCat:   { color: COLORS.textSecondary, fontSize: 13, marginBottom: 14 },
-  colHeaders: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  colLabel:   { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  bottomBar:  {  padding: 16, 
-  backgroundColor: COLORS.background, 
-  borderTopWidth: 1, 
-  borderTopColor: COLORS.border },
-  finishBtn:  { backgroundColor: COLORS.orange, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  chipsScroll: { flexGrow: 0 },
+  chips: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 200,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
+  },
+  chipDone: { borderColor: COLORS.green + '66' },
+  chipActive: { backgroundColor: COLORS.orange, borderColor: COLORS.orange },
+  chipText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600', flexShrink: 1 },
+  chipTextActive: { color: COLORS.white },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+  exCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16 },
+  exTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  exOf: { color: COLORS.orange, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  exName: { color: COLORS.white, fontSize: 18, fontWeight: '700', marginTop: 2 },
+  exCat: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
+  infoBtn: { padding: 8, borderRadius: 10, backgroundColor: COLORS.cardDark },
+  colHeaders: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4, paddingBottom: 6,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
+  },
+  colLabel: { color: COLORS.textSecondary, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'center' },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
+  navBtn: { width: 52, height: 52, borderRadius: 14, backgroundColor: COLORS.card, alignItems: 'center', justifyContent: 'center' },
+  navBtnDisabled: { opacity: 0.35 },
+  timerBox: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  timerBig: { color: COLORS.white, fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'], minWidth: 90, textAlign: 'center' },
+  timerPaused: { color: COLORS.textSecondary },
+  timerButtons: { flexDirection: 'row', gap: 6 },
+  timerBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: COLORS.card, alignItems: 'center', justifyContent: 'center' },
+  bottomBar: { paddingHorizontal: 16, paddingBottom: 12, paddingTop: 4, backgroundColor: COLORS.background },
+  finishBtn: {
+    backgroundColor: COLORS.orange, borderRadius: 14, paddingVertical: 15,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
   finishText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
-  switchContainer: {flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 10, justifyContent: 'space-between', alignItems: 'center' },
-  btnswitch: { padding: 12, backgroundColor: COLORS.card, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  btnswitchText: { color: COLORS.white, fontSize: 14 }, 
-  timerControls: { flex: 1, alignItems: 'center', gap: 8 },
-  timerBig: { color: COLORS.white, fontSize: 22, fontWeight: '800' },
-  timerButtons: { flexDirection: 'row', gap: 8 },
-  timerBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: COLORS.card },
-  timerBtnText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
 });
