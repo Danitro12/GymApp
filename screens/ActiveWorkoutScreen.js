@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '@expo/vector-icons/MaterialIcons';
+import Svg, { Circle } from 'react-native-svg';
 import { COLORS } from '../data/theme';
 import ExerciseSetRow from '../components/ExerciseSetRow';
 import ExerciseThumb from '../components/ExerciseThumb';
@@ -12,7 +13,7 @@ import { getExerciseById, getCategoryLabel, resolveExerciseName } from '../data/
 import { loadRoutineRecords } from '../data/storage';
 import { useLanguage } from '../context/LanguageContext';
 import {
-  useWorkout, useNow, getElapsedMs, countCompletedExercises,
+  useWorkout, useNow, getElapsedMs, getRestMs, countCompletedExercises,
 } from '../context/WorkoutContext';
 import { confirmAsync } from '../utils/dialogs';
 import { formatDuration } from '../utils/date';
@@ -22,7 +23,7 @@ export default function ActiveWorkoutScreen({ navigation }) {
   const { t, language } = useLanguage();
   const {
     session, loaded, updateSession, finishWorkout, discardWorkout,
-    pauseTimer, resumeTimer, resetTimer,
+    pauseTimer, resumeTimer, resetTimer, restartRest,
   } = useWorkout();
   const scrollRef = useRef(null);
   const chipsRef = useRef(null);
@@ -30,7 +31,9 @@ export default function ActiveWorkoutScreen({ navigation }) {
   const [busy, setBusy] = useState(false);
 
   const running = !!session?.timer?.runningSince;
-  const now = useNow(!!session && running, 1000);
+  // Tic cada segundo mientras haya sesión: el descanso cuenta aunque el
+  // cronómetro total esté en pausa.
+  const now = useNow(!!session, 1000);
 
   const leave = useCallback(() => {
     if (navigation.canGoBack()) navigation.goBack();
@@ -60,6 +63,8 @@ export default function ActiveWorkoutScreen({ navigation }) {
   const { routine, exerciseSets } = session;
   const total = exerciseSets.length;
   const elapsedSec = getElapsedMs(session, now) / 1000;
+  const restMs = getRestMs(session, now);
+  const restSec = restMs === null ? null : restMs / 1000;
 
   const setIndex = (i) => updateSession((s) => ({ ...s, currentIndex: Math.max(0, Math.min(total - 1, i)) }));
 
@@ -67,6 +72,7 @@ export default function ActiveWorkoutScreen({ navigation }) {
     const value = sanitizeNumberInput(raw);
     updateSession((s) => {
       const next = [...s.exerciseSets];
+      let justChecked = false;
       next[exIndex] = {
         ...next[exIndex],
         sets: next[exIndex].sets.map((set, i) => {
@@ -74,21 +80,24 @@ export default function ActiveWorkoutScreen({ navigation }) {
           const updated = { ...set, [field]: value };
           // Se marca sola cuando reps y peso están rellenos.
           updated.checked = updated.reps !== '' && updated.weight !== '';
+          justChecked = updated.checked && !set.checked;
           return updated;
         }),
       };
-      return { ...s, exerciseSets: next };
+      // Al completar una serie empieza a contar el descanso.
+      return { ...s, exerciseSets: next, lastSetAt: justChecked ? Date.now() : s.lastSetAt };
     });
   };
 
   const toggleCheck = (exIndex, sIdx) => {
     updateSession((s) => {
       const next = [...s.exerciseSets];
+      const wasChecked = next[exIndex].sets[sIdx]?.checked;
       next[exIndex] = {
         ...next[exIndex],
         sets: next[exIndex].sets.map((set, i) => (i === sIdx ? { ...set, checked: !set.checked } : set)),
       };
-      return { ...s, exerciseSets: next };
+      return { ...s, exerciseSets: next, lastSetAt: !wasChecked ? Date.now() : s.lastSetAt };
     });
   };
 
@@ -226,7 +235,42 @@ export default function ActiveWorkoutScreen({ navigation }) {
         )}
       </ScrollView>
 
-      <View style={styles.controls}>
+      {/* Relojes: descanso (desde la última serie) + duración total */}
+      <View style={styles.clockPanel}>
+        <TouchableOpacity
+          onPress={restartRest}
+          disabled={restSec === null}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`${t.restLabel}: ${t.tapToRestart}`}
+        >
+          <RestRing seconds={restSec} size={104} label={t.restLabel} hint={restSec === null ? t.markASet : t.tapToRestart} />
+        </TouchableOpacity>
+
+        <View style={styles.totalBox}>
+          <Text style={styles.clockLabel}>
+            {t.totalLabelTime}{!running ? ` · ${t.paused}` : ''}
+          </Text>
+          <Text style={[styles.totalBig, !running && styles.timerPaused]} numberOfLines={1} adjustsFontSizeToFit>
+            {formatDuration(elapsedSec)}
+          </Text>
+          <View style={styles.timerButtons}>
+            <TouchableOpacity
+              style={[styles.timerBtn, !running && styles.timerBtnPlay]}
+              onPress={running ? pauseTimer : resumeTimer}
+              activeOpacity={0.8}
+              accessibilityLabel={running ? 'Pause timer' : 'Resume timer'}
+            >
+              <Icon name={running ? 'pause' : 'play-arrow'} size={24} color={COLORS.white} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.timerBtn} onPress={resetTimer} activeOpacity={0.8} accessibilityLabel="Reset timer">
+              <Icon name="replay" size={22} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.bottomBar}>
         <TouchableOpacity
           style={[styles.navBtn, idx === 0 && styles.navBtnDisabled]}
           onPress={() => setIndex(idx - 1)}
@@ -235,24 +279,10 @@ export default function ActiveWorkoutScreen({ navigation }) {
         >
           <Icon name="chevron-left" size={28} color={COLORS.white} />
         </TouchableOpacity>
-
-        <View style={styles.timerBox}>
-          <Text style={[styles.timerBig, !running && styles.timerPaused]}>{formatDuration(elapsedSec)}</Text>
-          <View style={styles.timerButtons}>
-            <TouchableOpacity
-              style={styles.timerBtn}
-              onPress={running ? pauseTimer : resumeTimer}
-              activeOpacity={0.8}
-              accessibilityLabel={running ? 'Pause timer' : 'Resume timer'}
-            >
-              <Icon name={running ? 'pause' : 'play-arrow'} size={26} color={running ? COLORS.white : COLORS.green} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.timerBtn} onPress={resetTimer} activeOpacity={0.8} accessibilityLabel="Reset timer">
-              <Icon name="replay" size={24} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
+        <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} activeOpacity={0.85} disabled={busy}>
+          <Icon name="flag" size={20} color={COLORS.white} />
+          <Text style={styles.finishText}>{t.finishWorkout}</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.navBtn, idx >= total - 1 && styles.navBtnDisabled]}
           onPress={() => setIndex(idx + 1)}
@@ -262,16 +292,53 @@ export default function ActiveWorkoutScreen({ navigation }) {
           <Icon name="chevron-right" size={28} color={COLORS.white} />
         </TouchableOpacity>
       </View>
-
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} activeOpacity={0.85} disabled={busy}>
-          <Icon name="flag" size={20} color={COLORS.white} />
-          <Text style={styles.finishText}>{t.finishWorkout}</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
+
+// Anillo de descanso: da una vuelta completa por minuto, como la aguja de
+// segundos de un cronómetro; el tiempo exacto va en el centro.
+function RestRing({ seconds, size, label, hint }) {
+  const stroke = 7;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const has = seconds !== null;
+  const secs = has ? Math.floor(seconds) : 0;
+  const progress = has ? (secs % 60) / 60 : 0;
+  const minutes = Math.floor(secs / 60);
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={COLORS.border} strokeWidth={stroke} fill="transparent" />
+        {has && progress > 0 && (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke={COLORS.orange}
+            strokeWidth={stroke}
+            fill="transparent"
+            strokeDasharray={`${progress * c} ${c}`}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        )}
+      </Svg>
+      <Text style={ring.label}>{label}</Text>
+      <Text style={[ring.time, !has && ring.timeEmpty]}>
+        {has ? `${minutes}:${String(secs % 60).padStart(2, '0')}` : '0:00'}
+      </Text>
+      <Text style={ring.hint} numberOfLines={1}>{hint}</Text>
+    </View>
+  );
+}
+
+const ring = StyleSheet.create({
+  label: { color: COLORS.orange, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  time: { color: COLORS.white, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'], marginVertical: 1 },
+  timeEmpty: { color: COLORS.textMuted },
+  hint: { color: COLORS.textMuted, fontSize: 10, fontWeight: '600', maxWidth: 88, textAlign: 'center' },
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
@@ -302,17 +369,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
   colLabel: { color: COLORS.textSecondary, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'center' },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
+  clockPanel: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    marginHorizontal: 16, marginBottom: 10, padding: 12, paddingRight: 16,
+    backgroundColor: COLORS.card, borderRadius: 20,
+  },
+  totalBox: { flex: 1, alignItems: 'center', gap: 6 },
+  clockLabel: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  totalBig: { color: COLORS.white, fontSize: 36, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  timerPaused: { color: COLORS.textSecondary },
+  timerButtons: { flexDirection: 'row', gap: 10 },
+  timerBtn: { width: 46, height: 40, borderRadius: 12, backgroundColor: COLORS.cardDark, alignItems: 'center', justifyContent: 'center' },
+  timerBtnPlay: { backgroundColor: COLORS.green },
   navBtn: { width: 52, height: 52, borderRadius: 14, backgroundColor: COLORS.card, alignItems: 'center', justifyContent: 'center' },
   navBtnDisabled: { opacity: 0.35 },
-  timerBox: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  timerBig: { color: COLORS.white, fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'], minWidth: 90, textAlign: 'center' },
-  timerPaused: { color: COLORS.textSecondary },
-  timerButtons: { flexDirection: 'row', gap: 6 },
-  timerBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: COLORS.card, alignItems: 'center', justifyContent: 'center' },
-  bottomBar: { paddingHorizontal: 16, paddingBottom: 12, paddingTop: 4, backgroundColor: COLORS.background },
+  bottomBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 12, paddingTop: 2 },
   finishBtn: {
-    backgroundColor: COLORS.orange, borderRadius: 14, paddingVertical: 15,
+    flex: 1, height: 52, backgroundColor: COLORS.orange, borderRadius: 14,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   finishText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },

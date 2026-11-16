@@ -11,6 +11,7 @@ import {
 } from '../data/storage';
 import { getExerciseById, getExerciseName } from '../data/exercises';
 import { toDateKey } from '../utils/date';
+import useKeepScreenOn from '../hooks/useKeepScreenOn';
 
 // ─── Entrenamiento activo ─────────────────────────────────────────────────────
 // El cronómetro NO cuenta ticks: guarda cuándo se puso en marcha
@@ -29,6 +30,11 @@ export const getElapsedMs = (session, now = Date.now()) => {
   return accumulatedMs + (runningSince ? Math.max(0, now - runningSince) : 0);
 };
 
+// Descanso = tiempo desde la última serie marcada (null si aún no hay ninguna).
+export const getRestMs = (session, now = Date.now()) => (
+  session?.lastSetAt ? Math.max(0, now - session.lastSetAt) : null
+);
+
 const buildSession = (routine) => {
   const now = Date.now();
   return {
@@ -45,6 +51,7 @@ const buildSession = (routine) => {
     currentIndex: 0,
     startedAt: now,
     timer: { accumulatedMs: 0, runningSince: now },
+    lastSetAt: null,
     updatedAt: now,
   };
 };
@@ -57,6 +64,9 @@ export function WorkoutProvider({ children }) {
   const [loaded, setLoaded] = useState(false);
   const sessionRef = useRef(null);
   const saveTimeout = useRef(null);
+
+  // Pantalla siempre encendida mientras haya un entreno en curso.
+  useKeepScreenOn(!!session);
 
   useEffect(() => {
     loadActiveWorkout().then((saved) => {
@@ -171,6 +181,9 @@ export function WorkoutProvider({ children }) {
     timer: { accumulatedMs: 0, runningSince: s.timer.runningSince ? Date.now() : null },
   })), [updateSession]);
 
+  // Reinicia el cronómetro de descanso (al marcar una serie o a mano).
+  const restartRest = useCallback(() => updateSession((s) => ({ ...s, lastSetAt: Date.now() })), [updateSession]);
+
   const value = useMemo(() => ({
     loaded,
     session,
@@ -181,7 +194,8 @@ export function WorkoutProvider({ children }) {
     pauseTimer,
     resumeTimer,
     resetTimer,
-  }), [loaded, session, startWorkout, updateSession, finishWorkout, discardWorkout, pauseTimer, resumeTimer, resetTimer]);
+    restartRest,
+  }), [loaded, session, startWorkout, updateSession, finishWorkout, discardWorkout, pauseTimer, resumeTimer, resetTimer, restartRest]);
 
   return <WorkoutContext.Provider value={value}>{children}</WorkoutContext.Provider>;
 }

@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { COLORS } from '../data/theme';
 import { useLanguage } from '../context/LanguageContext';
-import { useWorkout, useNow, getElapsedMs, countCompletedExercises } from '../context/WorkoutContext';
+import {
+  useWorkout, useNow, getElapsedMs, getRestMs, countCompletedExercises,
+} from '../context/WorkoutContext';
 import { formatDuration } from '../utils/date';
 
 // Barra flotante sobre las pestañas mientras hay un entreno en curso.
@@ -11,19 +13,24 @@ export default function ActiveWorkoutBar({ onPress }) {
   const { t } = useLanguage();
   const { session } = useWorkout();
   const running = !!session?.timer?.runningSince;
-  const now = useNow(!!session && running);
+  const now = useNow(!!session);
   if (!session) return null;
 
   const elapsed = getElapsedMs(session, now) / 1000;
   const done = countCompletedExercises(session);
   const total = session.routine.exercises.length;
+  const restMs = getRestMs(session, now);
+  const rest = restMs === null ? null : Math.floor(restMs / 1000);
 
   return (
     <TouchableOpacity style={styles.bar} onPress={onPress} activeOpacity={0.9} accessibilityRole="button">
       <View style={[styles.pulse, !running && styles.pulsePaused]} />
       <View style={{ flex: 1 }}>
         <Text style={styles.label}>{t.workoutInProgress}</Text>
-        <Text style={styles.name} numberOfLines={1}>{session.routine.name} · {done}/{total}</Text>
+        <Text style={styles.name} numberOfLines={1}>
+          {session.routine.name} · {done}/{total}
+          {rest !== null ? ` · ${t.restLabel} ${Math.floor(rest / 60)}:${String(rest % 60).padStart(2, '0')}` : ''}
+        </Text>
       </View>
       <Text style={[styles.time, !running && styles.timePaused]}>
         {running ? formatDuration(elapsed) : `${formatDuration(elapsed)} · ${t.paused}`}
