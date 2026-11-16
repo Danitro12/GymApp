@@ -22,6 +22,7 @@ import ActiveWorkoutScreen from '../screens/ActiveWorkoutScreen';
 import CreateRoutineScreen from '../screens/CreateRoutineScreen';
 import CreateExerciseScreen from '../screens/CreateExerciseScreen';
 import ExerciseInfoScreen from '../screens/ExerciseInfoScreen';
+import DataScreen from '../screens/DataScreen';
 
 const AppStack = createNativeStackNavigator();
 
@@ -172,6 +173,7 @@ export default function TabNavigator() {
       <AppStack.Screen name="CreateExercise" component={CreateExerciseScreen} />
       <AppStack.Screen name="ExerciseInfo" component={ExerciseInfoScreen} />
       <AppStack.Screen name="History" component={HistoryScreen} />
+      <AppStack.Screen name="Data" component={DataScreen} />
     </AppStack.Navigator>
   );
 }

@@ -16,6 +16,11 @@ Proyecto universitario de entrenamiento (React Native + Expo, también como web)
   igual que los del catálogo: rutinas, mapa muscular, historial y récords.
 - **Mapa muscular** por rutina y por ejercicio.
 - **Historial** con calendario y récords por serie.
+- **Importar / Exportar** (Ajustes, Rutinas o Historial):
+  - Historial a Excel por rango de fechas: hojas *Entrenos*, *Series* y *Por ejercicio* (peso máximo y 1RM estimado).
+  - Rutinas a Excel y desde Excel, CSV, JSON o pegando una tabla (copiada de Excel o en Markdown).
+    Formato: una fila por ejercicio con `Rutina | Días | Ejercicio | Series | Reps` (Reps admite `10` o `12-10-8`;
+    si `Rutina` está vacía, la fila va a la rutina de arriba). La plantilla incluye la lista de ejercicios disponibles.
 - Español / inglés.
 
 Todos los datos se guardan en el dispositivo (AsyncStorage; `localStorage` en la web).

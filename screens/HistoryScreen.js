@@ -8,7 +8,7 @@ import { COLORS } from '../data/theme';
 import { loadHistory, loadRoutines } from '../data/storage';
 import { useLanguage } from '../context/LanguageContext';
 import { resolveExerciseName } from '../data/exercises';
-import ScreenHeader from '../components/ScreenHeader';
+import ScreenHeader, { HeaderIconButton } from '../components/ScreenHeader';
 import { toDateKey, fromDateKey, weekdayIndex, localeFor, historyMinutes } from '../utils/date';
 export default function HistoryScreen({ navigation, route }) {
   const { t, language } = useLanguage();
@@ -75,7 +75,20 @@ export default function HistoryScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScreenHeader onBack={() => navigation.goBack()} title={t.workoutHistory} />
+      <ScreenHeader
+        onBack={() => navigation.goBack()}
+        title={t.workoutHistory}
+        right={(
+          <HeaderIconButton
+            icon="file-download"
+            label={t.exportToExcel}
+            onPress={() => navigation.navigate('Data', {
+              from: toDateKey(new Date(year, month, 1)),
+              to: toDateKey(new Date(year, month + 1, 0)),
+            })}
+          />
+        )}
+      />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Calendario */}
