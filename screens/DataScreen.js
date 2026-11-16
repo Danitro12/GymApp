@@ -69,7 +69,7 @@ export default function DataScreen({ navigation, route }) {
   const [showHelp, setShowHelp] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
-  const [preview, setPreview] = useState(null); // { routines: [...] }
+  const [preview, setPreview] = useState(null); // { routines: [...], source }
 
   useFocusEffect(useCallback(() => {
     loadHistory().then(setHistory);
@@ -201,6 +201,19 @@ export default function DataScreen({ navigation, route }) {
     showPreview(parseRoutinesText(text, parseOpts, textToRows));
   });
 
+  const openPaste = () => {
+    setPasteText('');
+    setPasteOpen(true);
+  };
+
+  // Cerrar la revisión sin importar: si venía de "Pegar texto", volvemos a él
+  // con el texto intacto para poder corregirlo.
+  const closePreview = () => {
+    const fromPaste = preview?.source === 'paste';
+    setPreview(null);
+    if (fromPaste) setPasteOpen(true);
+  };
+
   const reviewPaste = () => {
     const result = parseRoutinesText(pasteText, parseOpts, textToRows);
     if (!result.routines.length) {
@@ -208,7 +221,7 @@ export default function DataScreen({ navigation, route }) {
       return;
     }
     setPasteOpen(false);
-    setPreview(result);
+    setPreview({ ...result, source: 'paste' });
   };
 
   // Marca repetidos dentro de cada rutina (la app no admite el mismo
@@ -225,6 +238,7 @@ export default function DataScreen({ navigation, route }) {
       }),
     };
   }), [preview]);
+  const existingNames = useMemo(() => new Set(routines.map((r) => String(r.name).trim().toLowerCase())), [routines]);
   const importable = previewRoutines.filter((r) => r.items.some((i) => i.status === 'ok' || i.status === 'approx'));
 
   const confirmImport = () => run('confirm', async () => {
@@ -235,6 +249,7 @@ export default function DataScreen({ navigation, route }) {
     const n = importable.length;
     setPreview(null);
     setPasteText('');
+    loadRoutines().then(setRoutines);
     notify(t.dataTitle, fmt(t.importDone, { n }));
     navigation.navigate('Tabs');
     switchTab('Routines');
@@ -305,7 +320,7 @@ export default function DataScreen({ navigation, route }) {
           <View style={styles.grid}>
             <ActionTile icon="file-download" label={t.exportRoutines} sub={`${routines.length} ${routines.length === 1 ? t.routine.toLowerCase() : t.routinesPl}`} onPress={exportRoutines} loading={busy === 'routines'} />
             <ActionTile icon="upload-file" label={t.importFile} sub=".xlsx · .csv · .json" onPress={importFromFile} loading={busy === 'import'} />
-            <ActionTile icon="content-paste" label={t.pasteText} sub="Excel · CSV · Markdown" onPress={() => setPasteOpen(true)} />
+            <ActionTile icon="content-paste" label={t.pasteText} sub="Excel · CSV · Markdown" onPress={openPaste} />
             <ActionTile icon="description" label={t.template} sub=".xlsx" onPress={downloadTemplate} loading={busy === 'template'} />
           </View>
 
@@ -346,7 +361,15 @@ export default function DataScreen({ navigation, route }) {
                 <Icon name="close" size={18} color={COLORS.textSecondary} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.sheetHint}>{t.pasteHint}</Text>
+            <View style={styles.hintRow}>
+              <Text style={[styles.sheetHint, { flex: 1 }]}>{t.pasteHint}</Text>
+              {!!pasteText && (
+                <TouchableOpacity onPress={() => setPasteText('')} style={styles.clearBtn} hitSlop={6}>
+                  <Icon name="backspace" size={16} color={COLORS.textSecondary} />
+                  <Text style={styles.clearText}>{t.clearText}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <TextInput
               style={styles.pasteInput}
               value={pasteText}
@@ -373,12 +396,12 @@ export default function DataScreen({ navigation, route }) {
       </Modal>
 
       {/* ── Vista previa de importación ── */}
-      <Modal visible={!!preview} transparent animationType="slide" onRequestClose={() => setPreview(null)}>
+      <Modal visible={!!preview} transparent animationType="slide" onRequestClose={closePreview}>
         <View style={styles.overlay}>
           <View style={[styles.sheet, styles.sheetTall]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{t.importReview}</Text>
-              <TouchableOpacity onPress={() => setPreview(null)} style={styles.closeBtn}>
+              <TouchableOpacity onPress={closePreview} style={styles.closeBtn} accessibilityLabel={t.cancel}>
                 <Icon name="close" size={18} color={COLORS.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -387,6 +410,9 @@ export default function DataScreen({ navigation, route }) {
                 <View key={`${r.name}-${ri}`} style={styles.previewCard}>
                   <Text style={styles.previewName}>{r.name}</Text>
                   <Text style={styles.previewDays}>{r.days.length ? formatDays(r.days, language) : t.noDaysSet}</Text>
+                  {existingNames.has(r.name.trim().toLowerCase()) && (
+                    <Text style={styles.previewWarn}>{t.routineExistsNote}</Text>
+                  )}
                   {r.items.map((it, ii) => {
                     const ok = it.status === 'ok' || it.status === 'approx';
                     const shownName = it.exercise ? getExerciseText(it.exercise, language).name : it.raw;
@@ -484,6 +510,10 @@ const styles = StyleSheet.create({
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetTitle: { color: COLORS.white, fontSize: 18, fontWeight: '700' },
   sheetHint: { color: COLORS.textSecondary, fontSize: 13 },
+  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: COLORS.card },
+  clearText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '700' },
+  previewWarn: { color: COLORS.orange, fontSize: 11, marginTop: -4, marginBottom: 8 },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.card, alignItems: 'center', justifyContent: 'center' },
   pasteInput: {
     minHeight: 220, maxHeight: 360, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border,

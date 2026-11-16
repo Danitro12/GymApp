@@ -137,6 +137,19 @@ export const buildExerciseMatcher = (exercises) => {
   };
 };
 
+// Si una fila es idéntica a otra ya leída en la misma rutina (mismo ejercicio
+// y mismas series), es un duplicado accidental (p. ej. la tabla pegada dos
+// veces) y se ignora. Si cambian las series, se deja para avisar en la revisión.
+const sameItem = (a, b) => {
+  const keyA = a.exercise ? a.exercise.id : normalizeText(a.raw);
+  const keyB = b.exercise ? b.exercise.id : normalizeText(b.raw);
+  return keyA === keyB && a.reps.join('-') === b.reps.join('-');
+};
+const pushItem = (routine, item) => {
+  if (routine.items.some((it) => sameItem(it, item))) return;
+  routine.items.push(item);
+};
+
 // ── Filas → rutinas ──
 const findHeader = (rows) => {
   for (let i = 0; i < Math.min(rows.length, 10); i += 1) {
@@ -189,7 +202,7 @@ export const rowsToRoutines = (rows, { exercises, fallbackName = 'Rutina' }) => 
     if (!exName) return;
 
     const { exercise, approx } = match(exName, get(iId));
-    current.items.push({ raw: exName, exercise, approx, reps: parseSetsReps(get(iSets), get(iReps)) });
+    pushItem(current, { raw: exName, exercise, approx, reps: parseSetsReps(get(iSets), get(iReps)) });
   });
 
   return { routines: routines.filter((r) => r.items.length) };
@@ -210,7 +223,7 @@ export const jsonToRoutines = (data, { exercises, fallbackName = 'Rutina' }) => 
         ? e.sets.map((s) => Number(typeof s === 'object' ? s.reps : s) || DEFAULT_REPS)
         : parseSetsReps(e.sets ?? e.series, Array.isArray(e.reps) ? e.reps.join('-') : e.reps);
       return { raw, exercise, approx, reps };
-    }).filter((i) => i.raw),
+    }).filter((i) => i.raw).reduce((acc, item) => { pushItem({ items: acc }, item); return acc; }, []),
   })).filter((r) => r.items.length);
   return { routines };
 };

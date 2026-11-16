@@ -219,6 +219,8 @@ const translations = {
     sheetRoutines: 'Routines',
     sheetExercises: 'Available exercises',
     exampleRoutine: 'Upper body',
+    clearText: 'Clear',
+    routineExistsNote: 'You already have a routine with this name; this one will be added as a new one.',
 
     // Settings
     settingsTitle: 'Settings',
@@ -450,6 +452,8 @@ const translations = {
     sheetRoutines: 'Rutinas',
     sheetExercises: 'Ejercicios disponibles',
     exampleRoutine: 'Torso',
+    clearText: 'Borrar',
+    routineExistsNote: 'Ya tienes una rutina con este nombre; esta se añadirá como otra nueva.',
 
     // Settings
     settingsTitle: 'Ajustes',
